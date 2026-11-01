@@ -1,0 +1,17 @@
+{
+  "name": "louis-codex-pet",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun tools/build.ts",
+    "test": "bun test tools --timeout 30000",
+    "check:setup": "bun tools/check-dependencies.ts"
+  },
+  "dependencies": {
+    "sharp": "0.35.5"
+  },
+  "packageManager": "bun@1.3.10",
+  "engines": {
+    "bun": "1.3.10"
+  }
+}

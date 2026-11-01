@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "atlas": {
+    "path": "assets/atlas.webp",
+    "sha256": "919fb8346bb1e45ecffedf88b0621edf9f7ce3e982fee34d8f24b331fe6c5bc1"
+  },
+  "license": {
+    "software": "0BSD",
+    "artwork": "CC0-1.0",
+    "softwareText": "LICENSE",
+    "artworkText": "LICENSE-ARTWORK"
+  },
+  "nativeBehavior": {
+    "timing": "The app controls animation timing.",
+    "greeting": "The app can skip the first-use wave and may not replay it when the pet is selected again."
+  }
+}
