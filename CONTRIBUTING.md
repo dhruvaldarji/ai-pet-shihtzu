@@ -1,5 +1,7 @@
 # Contributing
 
+Use an issue to report a bug or suggest a change. Remove private details from logs, screenshots, and examples before you post.
+
 Describe the problem and the change you want to make. Keep each change small. Include the checks you ran and their results.
 
 ## Setup
@@ -34,7 +36,11 @@ Do not add private reference photographs or personal information. Check rights b
 
 ## Pull requests
 
-Explain what changed, why it changed, and how you checked it. Use Conventional Commits. Update the relevant documentation when behavior changes.
+Submit all changes through a pull request. Fork the repository and create a branch for your change. Do not push changes directly to main.
+
+Use a Conventional Commit title, such as `fix: correct the install path`. Explain what changed, why it changed, and how you checked it. Update the relevant documentation when behavior changes.
+
+Wait for the `test` check to pass. Resolve each review thread before merge.
 
 Run the affected tests. Run `bun audit --audit-level=high` when changing dependencies. Test results do not replace artwork or live display review.
 
