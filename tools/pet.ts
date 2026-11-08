@@ -2,7 +2,8 @@
 import sharp from "sharp";
 import { createHash } from "node:crypto";
 import {readFile, writeFile} from 'node:fs/promises';
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
+import { validateWebp } from "./media";
 
 type State = { name: string; row: number; frames: number; delays: number[] };
 type Contract = {
@@ -33,17 +34,20 @@ export async function contract(): Promise<Contract> {
   return c;
 }
 
-export async function decode(path: string, c: Contract): Promise<Atlas> {
-  const image = sharp(path, { failOn: "error" });
+export async function decode(path: string | Buffer, c: Contract): Promise<Atlas> {
+  const bytes=typeof path==="string"?await readFile(path):path;
+  await validateWebp(bytes);
+  const label=typeof path==="string"?path:"atlas buffer";
+  const image = sharp(bytes, { failOn: "warning" });
   const meta = await image.metadata();
   if (meta.width !== c.layout.width || meta.height !== c.layout.height || meta.pages && meta.pages !== 1) {
-    throw new Error(`Atlas must be ${c.layout.width}x${c.layout.height}, one page: ${path}`);
+    throw new Error(`Atlas must be ${c.layout.width}x${c.layout.height}, one page: ${label}`);
   }
   const { data, info } = await image.ensureAlpha().toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
   if (info.channels !== 4 || info.width !== c.layout.width || info.height !== c.layout.height) {
-    throw new Error(`Unable to decode four-channel RGBA atlas: ${path}`);
+    throw new Error(`Unable to decode four-channel RGBA atlas: ${label}`);
   }
-  return { pixels: data, path };
+  return { pixels: data, path:label };
 }
 
 function cell(c: Contract, p: Buffer, row: number, col: number): Buffer {
@@ -141,9 +145,8 @@ export async function preview(atlas: string, stateName: string, output: string, 
   if (meta.pages !== frames.length || JSON.stringify(meta.delay) !== JSON.stringify(delays)) {
     throw new Error("GIF readback timing or frame count differs from contract");
   }
-  const manifest = { output:resolve(output), state:stateName, label:diagnostic?"gaze diagnostic preview":"native animation timing preview", diagnostic, repeats, frames:frames.length, delaysMs:delays, displaySize:[width,height], atlasRgbaSha256:digest(a.pixels), gifSha256:digest(await readFile(output)) };
+  const manifest = { output:basename(output), state:stateName, label:diagnostic?"gaze diagnostic preview":"native animation timing preview", diagnostic, repeats, frames:frames.length, delaysMs:delays, displaySize:[width,height], atlasRgbaSha256:digest(a.pixels), gifSha256:digest(await readFile(output)) };
   const manifestPath = `${output}.json`;
   await writeFile(manifestPath,JSON.stringify(manifest,null,2)+"\n");
   return {...manifest,manifest:resolve(manifestPath)};
 }
-
