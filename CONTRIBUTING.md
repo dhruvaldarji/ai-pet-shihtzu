@@ -65,6 +65,14 @@ Use a Conventional Commit title, such as `fix: correct the install path`. Explai
 
 Keep exactly one Conventional Commit in the final PR. Before merge, squash any intermediate commits and push the PR branch with `--force-with-lease`, never plain `--force`. Coordinate first if someone else is using that branch. Never rewrite `main`.
 
+Owner-approved stacks land bottom-up into `main`. The bottom PR targets `main`; each upper layer targets the preceding PR branch and contains exactly one commit relative to that base. Only GitHub's native stacked-PR support manages restacking. For ordinary linked PRs, retargeting an upper PR after squash-merging its lower layer does not rewrite its branch; explicitly restack it onto `main`. Do not merge an upper layer until its base is `main`, its range is exactly one Conventional Commit, and fresh checks and review have passed. Recheck every final head before merging.
+
+The `pr-policy` workflow uses `pull_request_target` in the trusted default-branch context with only `contents: read` to inspect PR metadata through GitHub's compare API. It does not check out or execute PR code. The workflow becomes active for PRs only after its definition lands on the default branch; the introducing PR tests its exact embedded script with mocked API responses rather than claiming a remote run.
+
+The read-only `pr-policy` check validates both the PR title and actual commit subject, counts commits relative to the PR base, and rejects merge commits. It reruns on pushes and title/base edits. To reproduce locally, save a GitHub pull-request event JSON, fetch the complete base/head history, and run `GITHUB_EVENT_PATH=/path/to/event.json bun run check:pr`. Never commit that event file. This check does not rewrite branches or approve merges; requiring it in branch protection is a separate owner-approved launch setting.
+
+Source CI runs on all PR base branches and pushes to `main`, not both branch pushes and PR events. Superseded runs are cancelled per PR; the required `test` status remains unchanged.
+
 Wait for `test` and both `production-artifact` checks to pass. Resolve each review thread before merge.
 
 Include exact commands, results, and anything not tested. Run `git diff --check` as well as affected tests. For user-facing guidance, check links and ensure generated package instructions agree with the source documentation. For app claims, record the tested app/version and platform; local filesystem tests alone do not prove playback. Maintainer approval is required to merge or publish; passing CI is not approval.
