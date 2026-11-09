@@ -4,6 +4,12 @@ Use an issue to report a bug or suggest a change. Remove private details from lo
 
 Describe the problem and the change you want to make. Keep each change small. Include the checks you ran and their results.
 
+## Pick an issue
+
+[GitHub Issues](https://github.com/dhruvaldarji/ai-pet-shihtzu/issues) are the source of truth for both local contributors and remote agents. Milestones group phases, parent issues group workstreams, and small implementation issues define each PR's scope. Read the issue's dependencies and acceptance criteria before starting; discuss substantial changes there first. Do not maintain a competing local backlog.
+
+One focused implementation issue should map to one PR targeting `main`. Link it with `Closes #number` when the PR completes the issue. Use `Refs #number` for partial work and explain what remains.
+
 ## Setup
 
 Use Bun 1.3.10. You also need `zip`, `unzip`, a POSIX shell, and a SHA256 command. Image processing uses the pinned Sharp dependency installed by Bun; separate WebP CLI tools are not required.
@@ -57,8 +63,14 @@ Submit all changes through a pull request. Fork the repository and create a bran
 
 Use a Conventional Commit title, such as `fix: correct the install path`. Explain what changed, why it changed, and how you checked it. Update the relevant documentation when behavior changes.
 
+Keep exactly one Conventional Commit in the final PR. Before merge, squash any intermediate commits and push the PR branch with `--force-with-lease`, never plain `--force`. Coordinate first if someone else is using that branch. Never rewrite `main`.
+
 Wait for `test` and both `production-artifact` checks to pass. Resolve each review thread before merge.
+
+Include exact commands, results, and anything not tested. Run `git diff --check` as well as affected tests. For user-facing guidance, check links and ensure generated package instructions agree with the source documentation. For app claims, record the tested app/version and platform; local filesystem tests alone do not prove playback. Maintainer approval is required to merge or publish; passing CI is not approval.
 
 Run the affected tests. Run `bun audit --audit-level=high` when changing dependencies. Test results do not replace artwork or live display review.
 
 Software contributions use 0BSD. Artwork contributions use CC0 1.0. Third-party material keeps its own terms and needs clear attribution where required.
+
+Be kind and constructive; see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Report security issues using [SECURITY.md](SECURITY.md), not a public bug report. See [MAINTAINERS.md](MAINTAINERS.md) for release responsibilities.
