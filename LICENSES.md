@@ -9,3 +9,9 @@
 Source artwork is in `assets/atlas.webp`. Runtime artwork is in `spritesheet.webp` and `preview.gif`. Synthetic images are under `fixtures/runtime/`.
 
 Third-party dependencies keep their own licenses. These project licenses do not change those terms.
+
+## Provenance
+
+The project owner confirms the necessary permissions to publish Louis's branding, artwork, and repository source under the terms above. The owner describes the Louis artwork as AI-assisted original artwork with no third-party credits required. This records the owner's confirmation, not an independent legal assessment.
+
+Private prompts, reference photos, and personal records are not part of this provenance record. New contributions must have appropriate permissions and preserve any required third-party notices.

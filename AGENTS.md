@@ -8,7 +8,7 @@ Use concise, simple English. Explain the next action before making changes. Repo
 2. Prefer a published release ZIP with its published checksum. Verify that checksum and the extracted `SHA256SUMS` before installation. Reject changed or unlisted files.
 3. If no suitable release is available, build the chosen source commit. Use frozen dependencies and the atlas hash in `SOURCE_INPUT.json`.
 4. Keep other pets unchanged. Record the existing target and save a complete backup before replacing it. Ask only if the intended target is unclear.
-5. Use a supported installation method for the actual app. Follow the local or cloud steps below.
+5. Use a supported installation method for the actual app. This repository does not currently claim cloud compatibility for its v2 sheet; do not upload it based only on generic host support.
 6. Verify the selected pet's source after installation. Report only what the checks establish. A local file write does not prove cloud delivery or visible playback.
 
 ### Local pets
@@ -21,16 +21,17 @@ If selection cannot be checked, state that the local files are installed and giv
 
 ### Cloud pets
 
-Use only supported pet tools for the actual host. A tool for ChatGPT Work does not authorize changes to another app.
+The current v2 sheet's cloud upload and native direct-link flows are unverified. Do not offer upload as a fallback for failed local installation. First establish the actual host's format requirements and obtain separate acceptance for the artifact and flow.
 
 For an existing cloud pet, use its stable ID and preserve its name, description, and other pets unless the user requests changes. Do not create a duplicate to refresh an existing pet.
 
 Read back the selected ID and download its fresh sprite sheet when supported. Compare decoded pixels with the package; cloud encoding can change file bytes. Do not treat local files or saved cache values as proof of the selected cloud source.
 
-If no supported cloud update is available, give the user the exact sprite sheet and a short native upload step. Explain that upload creates a new pet. Do not claim an unattended cloud update succeeded. Do not use private APIs or edit app caches.
+If compatibility or a supported update is unavailable, stop that flow and report the limitation. Do not create a duplicate, use private APIs, or edit app caches. Repository instructions do not perform unattended updates.
 
 ## Development
 
+- Read the GitHub issue, dependencies, and acceptance criteria before starting. Issues are the shared backlog for local and remote work; link the implementation PR as described in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Use Bun and the frozen lockfile. Run checks for the behavior you change.
 - Keep installation tests in temporary folders. Do not use the user's active pet folder for tests.
 - Build from an explicit atlas and expected SHA256. Never package synthetic test images as Louis.
@@ -38,4 +39,5 @@ If no supported cloud update is available, give the user the exact sprite sheet 
 - Compare complete frames and animation loops with the existing artwork. Technical checks do not replace visual or live review.
 - Keep personal photos, identities, local paths, credentials, and private records out of shared files.
 - Use Conventional Commits. Do not push, publish, change visibility, or rewrite remote history without authorization.
+- Keep one final commit per PR to `main`, with test evidence and explicit untested limitations. When authorized to consolidate, use force-with-lease on the PR branch only. Merge and publication still need owner approval.
 - Keep the software and artwork licenses separate. Preserve third-party license terms.

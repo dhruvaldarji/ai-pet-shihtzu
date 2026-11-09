@@ -28,6 +28,24 @@ test('both canonical terms survive the runtime ZIP byte for byte',async()=>{
  for(const name of ['LICENSE','LICENSE-ARTWORK'])expect(await readFile(join(f.root,'readback',name))).toEqual(await readFile(join(repo,name)));
  expect(await readFile(join(f.root,'readback/README.md'),'utf8')).toContain('Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK)');
 },30000);
+test('packaged guidance limits compatibility and documents explicit lifecycle operations',async()=>{
+ const f=await fixture();await buildRuntime(f);
+ const zip=join(f.root,f.out,'louis-motion-preview.zip'),readback=join(f.root,'guidance');
+ const p=Bun.spawn(['unzip','-q',zip,'-d',readback],{stdout:'pipe',stderr:'pipe'});expect(await p.exited).toBe(0);
+ const readme=await readFile(join(readback,'README.md'),'utf8'),notes=await readFile(join(readback,'RELEASE_NOTES.md'),'utf8');
+ for(const body of [readme,notes]){
+  expect(body).toContain('Native playback and direct-install links remain unverified');
+  expect(body).toContain('ChatGPT web/cloud upload are not supported');
+  expect(body).not.toContain('Upload pet');
+ }
+ expect(readme).toContain('no background updater');expect(readme).toContain('sh uninstall.sh');
+ expect(readme).toContain('<root>/pets/louis-motion-preview');expect(readme).not.toContain('{{id}}');
+ expect(readme).toContain('Do not overwrite or merge folders');expect(readme).toContain('SHA256SUMS');
+ expect(readme).toContain('root precedence is `LOUIS_CODEX_DIR`, then `CODEX_HOME`, then `$HOME/.codex`. Use the first nonempty value');
+ expect(readme).toContain('copy the complete `louis-motion-preview` folder');expect(readme).toContain('Keep the backup');
+ expect(readme).toContain('identical payload is a no-op');expect(readme).toContain('preserve custom files');
+ expect(readme).toContain('`.louis-motion-preview-lock`');expect(readme).not.toContain('~/.codex/pets/');
+},30000);
 test('either missing term rejects before creating runtime output',async()=>{
  for(const name of ['LICENSE','LICENSE-ARTWORK']){
   const f=await fixture();await copyFile(join(repo,name),join(f.root,name));

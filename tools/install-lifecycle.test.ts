@@ -18,7 +18,7 @@ for(const id of ["louis","louis-motion-preview"] as const) test("licensed built 
   expect(await extraction.exited).toBe(0);
   const readme=await readFile(join(source,"README.md"),"utf8");
   expect(readme).toContain(`The target is \`<root>/pets/${id}\`; root precedence is \`LOUIS_CODEX_DIR\`, then \`CODEX_HOME\`, then \`$HOME/.codex\`.`);
-  expect(readme).toContain("Root precedence is LOUIS_CODEX_DIR, then CODEX_HOME, then $HOME/.codex.");
+  expect(readme).toContain("Use the first nonempty value and the same root for every operation.");
   const root=join(sourceRoot,"local-target"),target=join(root,"pets",id),other=id==="louis"?"louis-motion-preview":"louis";
   await mkdir(join(root,"pets",other),{recursive:true});
   await writeFile(join(root,"pets",other,"protected.bin"),Buffer.from([0,42,255,9]));
