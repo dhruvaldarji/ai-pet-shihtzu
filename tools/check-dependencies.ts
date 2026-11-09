@@ -9,12 +9,6 @@ const check = (name: string, expected: string, actual: string) =>
   checks.push({name, expected, actual, pass: expected === actual});
 check("Bun", pkg.packageManager.replace(/^bun@/, ""), Bun.version);
 check("sharp", pkg.dependencies.sharp, sharp.versions.sharp);
-for (const name of ["cwebp", "webpmux"]) {
-  const path = Bun.which(name);
-  if (!path) { check(name, "1.6.0", "missing"); continue; }
-  const result = Bun.spawnSync([path, "-version"], {stdout: "pipe", stderr: "pipe"});
-  check(name, "1.6.0", result.exitCode === 0 ? result.stdout.toString().trim().split(/\r?\n/)[0] : "failed");
-}
 for (const name of ["zip", "unzip", "sh"]) check(name, "available", Bun.which(name) ? "available" : "missing");
 check("SHA256 utility", "available", Bun.which("shasum") || Bun.which("sha256sum") ? "available" : "missing");
 const input = Buffer.from([255, 240, 225, 255, 10, 20, 30, 0]);

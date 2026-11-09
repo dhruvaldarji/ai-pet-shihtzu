@@ -6,12 +6,13 @@ Describe the problem and the change you want to make. Keep each change small. In
 
 ## Setup
 
-Use Bun 1.3.10 and WebP 1.6.0. You also need `zip`, `unzip`, a POSIX shell, and a SHA256 command. A macOS Brewfile is included.
+Use Bun 1.3.10. You also need `zip`, `unzip`, a POSIX shell, and a SHA256 command. Image processing uses the pinned Sharp dependency installed by Bun; separate WebP CLI tools are not required.
 
 ```sh
 bun install --frozen-lockfile
 bun run check:setup
 bun test tools --timeout 30000
+bun run check:production
 ```
 
 ## Build a package
@@ -36,6 +37,12 @@ checks are safeguards, not proof that artwork or free text contains no private d
 
 Use `--id louis-motion-preview` and a new output folder for a separate local test package. Use temporary folders for installer tests.
 
+## Production artifact checks
+
+`bun run check:production` reads the production atlas path and hash from `SOURCE_INPUT.json`. It rejects a changed atlas, a fixture path, or the known synthetic fixture bytes, then builds Louis twice from separate fresh temporary source roots. It compares ZIP bytes and saved build records, checks the exact extracted allowlist, verifies both license texts and checksums, and exercises local install, repeated install, update, uninstall, and restore in a temporary root. No package is uploaded or published; temporary outputs are removed after the check.
+
+The `production-artifact` CI job runs on Ubuntu 24.04 and macOS 15. Reproducibility is checked within each platform, not between operating systems. The existing `test` job keeps synthetic regression tests and dependency auditing on Ubuntu. Windows and native app playback are not verified by these jobs. Passing CI does not approve artwork rights, a changed source hash, or publication; those still need maintainer review.
+
 ## Artwork changes
 
 Show the complete frames before and after the change. Include a full animation loop with native timing.
@@ -50,7 +57,7 @@ Submit all changes through a pull request. Fork the repository and create a bran
 
 Use a Conventional Commit title, such as `fix: correct the install path`. Explain what changed, why it changed, and how you checked it. Update the relevant documentation when behavior changes.
 
-Wait for the `test` check to pass. Resolve each review thread before merge.
+Wait for `test` and both `production-artifact` checks to pass. Resolve each review thread before merge.
 
 Run the affected tests. Run `bun audit --audit-level=high` when changing dependencies. Test results do not replace artwork or live display review.
 
