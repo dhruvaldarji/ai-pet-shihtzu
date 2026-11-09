@@ -5,7 +5,8 @@
   "scripts": {
     "build": "bun tools/build.ts",
     "test": "bun test tools --timeout 30000",
-    "check:setup": "bun tools/check-dependencies.ts"
+    "check:setup": "bun tools/check-dependencies.ts",
+    "check:production": "bun test checks --timeout 60000"
   },
   "dependencies": {
     "sharp": "0.35.5"
