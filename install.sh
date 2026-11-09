@@ -2,11 +2,11 @@
 set -eu
 
 louis_source=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
-louis_root="${LOUIS_CODEX_DIR:-${HOME:?HOME is not set}/.codex}"
-louis_pets="$louis_root/pets"
-louis_target="$louis_pets/louis"
+louis_root="${LOUIS_CODEX_DIR:-${CODEX_HOME:-${HOME:?HOME is not set}/.codex}}"
 louis_stage=
 louis_backup=
+louis_locked=
+louis_stage_writable=
 
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 finish_install() {
@@ -14,6 +14,7 @@ finish_install() {
   if [ -n "$louis_backup" ] && [ -d "$louis_backup/louis" ] && [ ! -e "$louis_target" ] && [ ! -L "$louis_target" ]; then
     if mv "$louis_backup/louis" "$louis_target"; then
       printf 'Previous Louis restored at: %s\n' "$louis_target" >&2
+      rmdir "$louis_backup" || :
     else
       printf 'Restore Louis manually from: %s/louis\n' "$louis_backup" >&2
       louis_exit=1
@@ -21,6 +22,9 @@ finish_install() {
   fi
   if [ -n "$louis_stage" ] && [ -d "$louis_stage" ]; then
     printf 'Unfinished install files kept at: %s\n' "$louis_stage" >&2
+  fi
+  if [ -n "$louis_locked" ]; then
+    rmdir "$louis_lock" || louis_exit=1
   fi
   exit "$louis_exit"
 }
@@ -76,17 +80,60 @@ for louis_file in $louis_payload; do
   [ "$louis_actual" = "$louis_expected" ] || fail "Package checksum mismatch: $louis_file"
 done
 
+mkdir -p "$louis_root"
+louis_root=$(CDPATH= cd -P "$louis_root" && printf '%s/' "$PWD")
+louis_root=${louis_root%/}
+louis_pets="$louis_root/pets"
+louis_target="$louis_pets/louis"
+louis_lock="$louis_root/.louis-lock"
+check_parents() {
+  for louis_parent in "$louis_pets" "$louis_root/pet-backups"; do
+    [ ! -L "$louis_parent" ] || fail "Managed parent is a symbolic link: $louis_parent"
+    [ ! -e "$louis_parent" ] || [ -d "$louis_parent" ] || fail "Managed parent is not a folder: $louis_parent"
+  done
+}
+check_parents
+(umask 077; mkdir "$louis_lock") 2>/dev/null || fail "Another Louis operation may be running. Lock: $louis_lock"
+louis_locked=1
+check_parents
 [ ! -L "$louis_target" ] || fail "Louis is a symbolic link. Save or remove that link before installing."
 [ ! -e "$louis_target" ] || [ -d "$louis_target" ] || fail "The Louis path exists but is not a folder: $louis_target"
 
-mkdir -p "$louis_pets" "$louis_root/pet-backups"
-louis_stage=$(mktemp -d "$louis_root/pet-backups/.louis-install.XXXXXX")
+louis_same=1
 for louis_file in pet.json spritesheet.webp; do
+  if [ -L "$louis_target/$louis_file" ] || [ ! -f "$louis_target/$louis_file" ]; then
+    louis_same=
+    break
+  fi
+  louis_actual=$(package_hash "$louis_target/$louis_file") || fail "Cannot hash installed file: $louis_file"
+  louis_expected=$(expected_hash "$louis_file") || fail "Cannot read checksum for $louis_file"
+  if [ "$louis_actual" != "$louis_expected" ]; then louis_same=; break; fi
+done
+if [ -n "$louis_same" ]; then
+  printf 'Louis is already up to date at: %s\n' "$louis_target"
+  exit 0
+fi
+
+mkdir -p "$louis_pets" "$louis_root/pet-backups"
+louis_stage=$(mktemp -d "$louis_pets/.louis-install.XXXXXX")
+louis_stage_writable=writable
+if [ -d "$louis_target" ]; then
+  cp -R -P -p "$louis_target/." "$louis_stage/"
+  louis_stage_writable=$(find "$louis_stage" -prune -perm -0200 -exec printf writable \;)
+  chmod u+w "$louis_stage"
+fi
+for louis_file in pet.json spritesheet.webp; do
+  # Never write through a preserved link or replace a user's directory as payload.
+  [ ! -d "$louis_stage/$louis_file" ] || [ -L "$louis_stage/$louis_file" ] || fail "Installed payload path is a folder: $louis_file"
+  rm -f "$louis_stage/$louis_file"
   cp "$louis_source/$louis_file" "$louis_stage/$louis_file"
   louis_expected=$(expected_hash "$louis_file") || fail "Cannot read checksum for $louis_file"
   louis_actual=$(package_hash "$louis_stage/$louis_file") || fail "Cannot hash staged file: $louis_file"
   [ "$louis_actual" = "$louis_expected" ] || fail "Staged checksum mismatch: $louis_file"
 done
+if [ -d "$louis_target" ] && [ -z "$louis_stage_writable" ]; then
+  chmod u-w "$louis_stage"
+fi
 
 if [ -d "$louis_target" ]; then
   mkdir -p "$louis_root/pet-backups"
@@ -95,11 +142,6 @@ if [ -d "$louis_target" ]; then
   printf 'Previous Louis saved at: %s\n' "$louis_backup/louis"
 fi
 
-if ! mv "$louis_stage" "$louis_target"; then
-  if [ -n "$louis_backup" ] && [ ! -e "$louis_target" ]; then
-    mv "$louis_backup/louis" "$louis_target" || fail "Install failed. Restore Louis from: $louis_backup/louis"
-  fi
-  fail "Install failed. Louis was not updated."
-fi
+mv "$louis_stage" "$louis_target" || fail "Install failed. Louis was not updated."
 louis_stage=
 printf 'Installed local Louis files at: %s\nThis does not update a ChatGPT Work cloud pet.\nSelect the intended pet and check its artwork on screen.\n' "$louis_target"

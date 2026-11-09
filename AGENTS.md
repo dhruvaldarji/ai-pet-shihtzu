@@ -13,7 +13,7 @@ Use concise, simple English. Explain the next action before making changes. Repo
 
 ### Local pets
 
-Use the bundled installer for the intended local root. Its default root is `~/.codex`; set `LOUIS_CODEX_DIR` for another location.
+Use the bundled installer for the intended local root. Root precedence is `LOUIS_CODEX_DIR`, then `CODEX_HOME`, then `~/.codex`. Use the same root for installation and removal. Identical payloads are a no-op; changed payloads retain custom files and a complete backup. Do not bypass a lifecycle lock or automatically remove a stale lock.
 
 Read back the installed `pet.json` and sprite sheet. Compare them with the package. Confirm the selected local pet when the app provides that capability.
 

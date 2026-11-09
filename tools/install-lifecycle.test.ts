@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, copyFile, cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { RUNTIME_FILES } from "./package";
 import { updateChecksums } from "./update-checksums";
 import { buildRuntime } from "./build";
@@ -16,6 +16,9 @@ for(const id of ["louis","louis-motion-preview"] as const) test("licensed built 
   const source=join(sourceRoot,"extracted"),zip=join(sourceRoot,"dist/review",id+".zip");
   const extraction=Bun.spawn(["unzip","-q",zip,"-d",source],{stdout:"pipe",stderr:"pipe"});
   expect(await extraction.exited).toBe(0);
+  const readme=await readFile(join(source,"README.md"),"utf8");
+  expect(readme).toContain(`The target is \`<root>/pets/${id}\`; root precedence is \`LOUIS_CODEX_DIR\`, then \`CODEX_HOME\`, then \`$HOME/.codex\`.`);
+  expect(readme).toContain("Root precedence is LOUIS_CODEX_DIR, then CODEX_HOME, then $HOME/.codex.");
   const root=join(sourceRoot,"local-target"),target=join(root,"pets",id),other=id==="louis"?"louis-motion-preview":"louis";
   await mkdir(join(root,"pets",other),{recursive:true});
   await writeFile(join(root,"pets",other,"protected.bin"),Buffer.from([0,42,255,9]));
@@ -71,10 +74,12 @@ async function fixture(sourceName="source",rootName="codex") {
 }
 
 async function runScript(source:string,root:string,name:"install.sh"|"uninstall.sh",env:Record<string,string>={}) {
-  const local=relative(dir,root);
+  const environment={...process.env,LOUIS_CODEX_DIR:root,...env};
+  const selected=environment.LOUIS_CODEX_DIR||environment.CODEX_HOME||join(environment.HOME!,".codex");
+  const local=relative(dir,resolve(selected));
   if(!local||local===".."||local.startsWith(`..${sep}`)||local.startsWith(sep)) throw new Error("Test target is outside its temporary root");
   const proc=Bun.spawn([Bun.which("sh")!,join(source,name)],{
-    env:{...process.env,...env,LOUIS_CODEX_DIR:root},stdout:"pipe",stderr:"pipe",
+    env:environment,stdout:"pipe",stderr:"pipe",
   });
   const [stdout,stderr,code]=await Promise.all([new Response(proc.stdout).text(),new Response(proc.stderr).text(),proc.exited]);
   return {stdout,stderr,code};
@@ -94,8 +99,29 @@ async function treeHashes(root:string,prefix=""):Promise<Record<string,string>> 
   return result;
 }
 
+async function treeModes(root:string,prefix=""):Promise<Record<string,number>> {
+  const result:Record<string,number>={};
+  for(const name of (await readdir(join(root,prefix))).sort()) {
+    const path=join(prefix,name),stat=await lstat(join(root,path));
+    if(stat.isSymbolicLink()) throw new Error(`Unexpected link in fixture: ${path}`);
+    result[path]=stat.mode&0o777;
+    if(stat.isDirectory())Object.assign(result,await treeModes(root,path));
+    else if(!stat.isFile())throw new Error(`Unexpected file type in fixture: ${path}`);
+  }
+  return result;
+}
+
 async function backupFolders(root:string) {
   return (await readdir(join(root,"pet-backups"))).sort().filter(name=>name.startsWith("louis-"));
+}
+
+async function restoreTempPermissions(path:string) {
+  const stat=await lstat(path).catch(()=>null);
+  if(!stat||stat.isSymbolicLink())return;
+  if(stat.isDirectory()) {
+    await chmod(path,0o700);
+    for(const name of await readdir(path))await restoreTempPermissions(join(path,name));
+  } else if(stat.isFile())await chmod(path,0o600);
 }
 
 test("fresh install, update, uninstall and both restores preserve complete payload hashes",async()=>{
@@ -114,6 +140,7 @@ test("fresh install, update, uninstall and both restores preserve complete paylo
   const installedV1=await treeHashes(target);
   await writePayload(source,2);
   const sourceV2={
+    ...installedV1,
     "pet.json":sha(await readFile(join(source,"pet.json"))),
     "spritesheet.webp":sha(await readFile(join(source,"spritesheet.webp"))),
   };
@@ -224,7 +251,7 @@ test("optional license pair requires coverage, matching bytes and ordinary files
 
 test("missing hash tools refuse installation and sha256sum fallback installs verified bytes",async()=>{
   const {source,root,target}=await fixture("source\\escaped","codex\nwrapped"),bin=join(source,"test-bin");await mkdir(bin);
-  for(const name of ["dirname","cat","awk","mkdir","mktemp","cp","mv","date"])await symlink(Bun.which(name)!,join(bin,name));
+  for(const name of ["dirname","cat","awk","mkdir","mktemp","cp","mv","date","rm","rmdir"])await symlink(Bun.which(name)!,join(bin,name));
   const absent=await runScript(source,root,"install.sh",{PATH:bin});
   expect(absent.code).toBe(1);expect(absent.stderr).toContain("A SHA256 tool is required");expect(await lstat(root).catch(()=>null)).toBeNull();
   const nativeSha=Bun.which("sha256sum");
@@ -242,4 +269,172 @@ for(const suffix of ["\\escaped","\nwrapped"])test(`checksum verification suppor
   const result=await runScript(source,root,"install.sh");expect(result.code).toBe(0);expect(result.stderr).toBe("");
   expect(await readFile(join(target,"pet.json"))).toEqual(await readFile(join(source,"pet.json")));
   expect(await readFile(join(target,"spritesheet.webp"))).toEqual(await readFile(join(source,"spritesheet.webp")));
+});
+
+test("identical installs preserve custom files without staging or new backups",async()=>{
+  const {source,root,target}=await fixture();
+  expect((await runScript(source,root,"install.sh")).code).toBe(0);
+  await writeFile(join(target,"custom.txt"),"keep this note\n");
+  const before=await treeHashes(root);
+  const result=await runScript(source,root,"install.sh");
+  expect(result.code).toBe(0);expect(result.stdout).toContain("already up to date");
+  expect(await treeHashes(root)).toEqual(before);
+  expect(await backupFolders(root)).toEqual([]);
+  await writeFile(join(source,"README.md"),"tampered package documentation\n");
+  expect((await runScript(source,root,"install.sh")).code).toBe(1);
+  expect(await treeHashes(root)).toEqual(before);
+});
+
+for(const selected of ["override","codex","home"])test(`install and uninstall respect ${selected} root precedence`,async()=>{
+  const {source,root}=await fixture();
+  const home=join(root,"home"),codex=join(root,"codex-home"),override=join(root,"override");
+  const env={HOME:home,CODEX_HOME:selected==="home"?"":codex,LOUIS_CODEX_DIR:selected==="override"?override:""};
+  const expected=selected==="override"?override:selected==="codex"?codex:join(home,".codex");
+  expect((await runScript(source,root,"install.sh",env)).code).toBe(0);
+  expect(await readFile(join(expected,"pets/louis/pet.json"))).toEqual(await readFile(join(source,"pet.json")));
+  expect((await runScript(source,root,"uninstall.sh",env)).code).toBe(0);
+  const before=await treeHashes(root);
+  expect((await runScript(source,root,"uninstall.sh",env)).code).toBe(0);
+  expect(await treeHashes(root)).toEqual(before);
+  expect(await backupFolders(expected)).toHaveLength(1);
+});
+
+test("canonical root aliases share the same installation",async()=>{
+  const {source,root,target}=await fixture(),alias=join(root,"../root-alias");
+  await mkdir(root);await symlink(root,alias);
+  expect((await runScript(source,alias,"install.sh")).code).toBe(0);
+  const before=await treeHashes(root);
+  expect((await runScript(source,root,"install.sh")).stdout).toContain("already up to date");
+  expect(await treeHashes(root)).toEqual(before);
+  expect((await runScript(source,alias,"uninstall.sh")).code).toBe(0);
+  expect(await lstat(target).catch(()=>null)).toBeNull();
+});
+
+for(const parent of ["pets","pet-backups"])test(`linked ${parent} is rejected by both lifecycle scripts`,async()=>{
+  const {source,root}=await fixture(),outside=join(root,"../protected");
+  await mkdir(root);await mkdir(outside);await writeFile(join(outside,"keep.txt"),"unchanged\n");
+  const before=await treeHashes(outside);
+  await symlink(outside,join(root,parent));
+  for(const name of ["install.sh","uninstall.sh"] as const){
+    const result=await runScript(source,root,name);
+    expect(result.code).toBe(1);expect(result.stderr).toContain("Managed parent is a symbolic link");
+    expect(await treeHashes(outside)).toEqual(before);
+    expect((await lstat(join(root,parent))).isSymbolicLink()).toBe(true);
+    expect(await lstat(join(root,".louis-lock")).catch(()=>null)).toBeNull();
+  }
+});
+
+test("both lifecycle scripts refuse and preserve an existing per-pet lock",async()=>{
+  const {source,root}=await fixture();
+  expect((await runScript(source,root,"install.sh")).code).toBe(0);
+  await mkdir(join(root,".louis-lock"));const before=await treeHashes(root);
+  for(const name of ["install.sh","uninstall.sh"] as const){
+    const result=await runScript(source,root,name);
+    expect(result.code).toBe(1);expect(result.stderr).toContain("operation may be running");
+    expect(await treeHashes(root)).toEqual(before);
+  }
+});
+
+test("failed staged promotion restores the complete previous pet and releases the lock",async()=>{
+  const {source,root,target}=await fixture(),bin=join(source,"fail-bin");
+  expect((await runScript(source,root,"install.sh")).code).toBe(0);
+  await writeFile(join(target,"custom.txt"),"keep during rollback\n");
+  const before=await treeHashes(target);
+  await writePayload(source,2);await mkdir(bin);
+  await writeFile(join(bin,"mv"),`#!/bin/sh\ncase "$1" in */.louis-install.*) echo 'injected promotion failure' >&2; exit 1;; esac\nexec '${Bun.which("mv")!}' "$@"\n`,{mode:0o755});
+  const result=await runScript(source,root,"install.sh",{PATH:`${bin}:${process.env.PATH}`});
+  expect(result.code).toBe(1);expect(result.stderr).toContain("Previous Louis restored");
+  expect(await treeHashes(target)).toEqual(before);
+  expect(await backupFolders(root)).toEqual([]);
+  expect(await lstat(join(root,".louis-lock")).catch(()=>null)).toBeNull();
+  expect((await readdir(join(root,"pets"))).filter(name=>name.startsWith(".louis-install."))).toHaveLength(1);
+  expect((await runScript(source,root,"install.sh")).code).toBe(0);
+  expect(await readFile(join(target,"custom.txt"),"utf8")).toBe("keep during rollback\n");
+});
+
+test("updates a read-only pet root while preserving custom modes and complete backup",async()=>{
+  expect(process.getuid?.()).not.toBe(0);
+  const {source,root,target}=await fixture();
+  expect((await runScript(source,root,"install.sh")).code).toBe(0);
+  const customDir=join(target,"custom"),customFile=join(customDir,"note.bin");
+  const customBytes=Buffer.from([0,17,255,64]);
+  await mkdir(customDir);await writeFile(customFile,customBytes);
+  const probeRoot=join(root,"mv-probe"),probeSourceParent=join(probeRoot,"source"),probeDestinationParent=join(probeRoot,"destination");
+  try {
+    await chmod(customFile,0o400);
+    await chmod(customDir,0o500);
+    await chmod(target,0o555);
+    const oldTree=await treeHashes(target);
+    const oldModes=await treeModes(target);
+    await writePayload(source,2);
+    await mkdir(probeSourceParent,{recursive:true});
+    await mkdir(probeDestinationParent,{recursive:true});
+    const probeSource=join(probeSourceParent,"louis"),probeDestination=join(probeDestinationParent,"louis");
+    await mkdir(probeSource);
+    await writeFile(join(probeSource,"marker"),"probe\n");
+    await chmod(probeSource,0o555);
+    const mv=Bun.which("mv");
+    if(!mv)throw new Error("mv is required for the lifecycle test");
+    const probe=Bun.spawn([mv,probeSource,probeDestination],{
+      env:{...process.env,LC_ALL:"C"},stdout:"pipe",stderr:"pipe",
+    });
+    const [probeStdout,probeStderr,probeCode]=await Promise.all([
+      new Response(probe.stdout).text(),new Response(probe.stderr).text(),probe.exited,
+    ]);
+    const readonlyMoveSupported=probeCode===0;
+    if(!readonlyMoveSupported)expect(probeStderr).toContain("Permission denied");
+    expect(probeStdout).toBe("");
+    await restoreTempPermissions(probeRoot);
+    await rm(probeRoot,{recursive:true,force:true});
+    const result=await runScript(source,root,"install.sh",{LC_ALL:"C"});
+    const updatedTree={
+      ...oldTree,
+      "pet.json":sha(await readFile(join(source,"pet.json"))),
+      "spritesheet.webp":sha(await readFile(join(source,"spritesheet.webp"))),
+    };
+    if(readonlyMoveSupported) {
+      expect(result.stderr).toBe("");
+      expect(result.code).toBe(0);
+      expect(await treeHashes(target)).toEqual(updatedTree);
+      expect(await readFile(customFile)).toEqual(customBytes);
+      expect((await lstat(target)).mode&0o777).toBe(0o555);
+      expect((await lstat(customDir)).mode&0o777).toBe(0o500);
+      expect((await lstat(customFile)).mode&0o777).toBe(0o400);
+      const backups=await backupFolders(root);
+      expect(backups).toHaveLength(1);
+      const backup=join(root,"pet-backups",backups[0],"louis");
+      expect(await treeHashes(backup)).toEqual(oldTree);
+      expect(await treeModes(backup)).toEqual(oldModes);
+    } else {
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain("Permission denied");
+      expect(result.stderr).toContain(target);
+      expect(result.stderr).toContain(join(root,"pet-backups"));
+      expect(result.stderr).not.toContain("rm:");
+      expect(result.stderr).not.toContain("cp:");
+      expect(result.stderr).toContain("Unfinished install files kept at:");
+      expect(await treeHashes(target)).toEqual(oldTree);
+      expect(await treeModes(target)).toEqual(oldModes);
+      expect(await readFile(customFile)).toEqual(customBytes);
+      const backups=await backupFolders(root);
+      expect(backups).toHaveLength(1);
+      expect(await lstat(join(root,"pet-backups",backups[0],"louis")).catch(()=>null)).toBeNull();
+      const stages=(await readdir(join(root,"pets"))).filter(name=>name.startsWith(".louis-install."));
+      expect(stages).toHaveLength(1);
+      const stage=join(root,"pets",stages[0]);
+      expect(await treeHashes(stage)).toEqual(updatedTree);
+      expect((await lstat(stage)).mode&0o777).toBe(0o555);
+      expect(await readFile(join(stage,"custom","note.bin"))).toEqual(customBytes);
+      expect((await lstat(join(stage,"custom"))).mode&0o777).toBe(0o500);
+      expect((await lstat(join(stage,"custom","note.bin"))).mode&0o777).toBe(0o400);
+    }
+    expect(await lstat(join(root,".louis-lock")).catch(()=>null)).toBeNull();
+  } finally {
+    await restoreTempPermissions(probeRoot);
+    await rm(probeRoot,{recursive:true,force:true});
+    for(const name of await readdir(join(root,"pets")).catch(()=>[])) {
+      if(name==="louis"||name.startsWith(".louis-install."))await restoreTempPermissions(join(root,"pets",name));
+    }
+    for(const name of await backupFolders(root).catch(()=>[]))await restoreTempPermissions(join(root,"pet-backups",name,"louis"));
+  }
 });
