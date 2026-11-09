@@ -23,7 +23,34 @@ Use these steps only if the agent cannot complete installation. Download and ext
 
 Upload creates a new cloud pet. To change an existing cloud pet, use its supported update tool when available. Installing local files does not update a cloud pet.
 
-For a different local root, set `LOUIS_CODEX_DIR` before running the installer. Run `sh uninstall.sh` to remove local Louis files and keep a backup.
+## Local updates and recovery
+
+The local root is the first nonempty value of `LOUIS_CODEX_DIR`, `CODEX_HOME`, or
+`$HOME/.codex`. Use the same root for installation, updates, and removal.
+
+To update, verify and extract the new release, then run `sh install.sh` there.
+The complete package is checked first. If the installed `pet.json` and sprite
+hashes already match, nothing is replaced and no backup is created. Otherwise,
+the installer preserves custom files, stages the new payload, and saves the
+complete previous pet under `pet-backups/` before replacement. Other pets stay
+unchanged. A failed replacement attempts to restore the previous pet; if that
+fails, the error identifies the retained backup and staging folder.
+
+Run `sh uninstall.sh` to move Louis into a complete backup. Repeating removal
+when Louis is absent is a no-op. To restore, stop other pet operations, remove
+any current Louis with the uninstaller, then copy the chosen backup's `louis`
+folder into the root's `pets/` folder. The destination must not already exist
+or be a symbolic link. Keep the backup until you verify the restored pet.
+
+The explicitly chosen root may resolve through platform or user directory
+aliases. Inside it, `pets`, `pet-backups`, and the Louis target must not be
+symbolic links. Both scripts use the same per-pet lock and refuse overlapping
+operations. After a crash, remove an empty `.louis-lock` directory with `rmdir`
+only after confirming no installer or uninstaller is still running. Do not
+edit managed folders concurrently with either script.
+
+These are local file operations, not automatic background updates. Select or
+refresh Louis in the intended app and check the artwork after an update.
 
 ## App behavior
 
