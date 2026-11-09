@@ -9,7 +9,7 @@ import{RUNTIME_FILES}from'./package';
 const repo=resolve(import.meta.dir,'..'),hash=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex');let temp:string;
 beforeAll(async()=>{temp=await mkdtemp(join(tmpdir(),'louis-source-build-'));});
 afterAll(async()=>{await rm(temp,{recursive:true,force:true});});
-async function fixture(){const root=await mkdtemp(join(temp,'case-'));for(const name of ['.gitignore','install.sh','uninstall.sh'])await copyFile(join(repo,name),join(root,name));await copyFile(join(repo,'fixtures/runtime/spritesheet.webp'),join(root,'input.webp'));return{root,atlas:'input.webp',sha256:hash(await readFile(join(root,'input.webp'))),out:'dist/test',id:'louis-motion-preview' as const};}
+async function fixture(){const root=await mkdtemp(join(temp,'case-'));for(const name of ['.gitignore','install.sh','uninstall.sh'])await copyFile(join(repo,name),join(root,name));await copyFile(join(repo,'fixtures/runtime/spritesheet.webp'),join(root,'input.webp'));return{root,atlas:'input.webp',sha256:hash(await readFile(join(root,'input.webp'))),out:'dist/test',id:'louis-motion-preview' as const,allowUnlicensedFixtures:true};}
 async function unzip(zip:string,args:string[]){const p=Bun.spawn(['unzip',...args,zip],{stdout:'pipe',stderr:'pipe'});const out=await new Response(p.stdout).text();expect(await p.exited).toBe(0);return out;}
 test('explicit input reaches exactly the runtime allowlist and no real installation',async()=>{const f=await fixture(),r=await buildRuntime(f),runtime=join(f.root,f.out,'runtime');expect(r.artworkAccepted).toBe(false);expect(r.installed).toBe(false);expect(r.published).toBe(false);expect(await readFile(join(runtime,'spritesheet.webp'))).toEqual(await readFile(join(f.root,f.atlas)));expect(JSON.parse(await readFile(join(runtime,'pet.json'),'utf8')).id).toBe('louis-motion-preview');const entries=await unzip(join(f.root,f.out,'louis-motion-preview.zip'),['-Z','-1']);expect(entries.trim().split('\n')).toEqual([...RUNTIME_FILES]);expect(await lstat(join(f.root,'pets')).catch(()=>null)).toBeNull();},30000);
 test('same input reproduces payload and ZIP bytes with fixed archive metadata',async()=>{const f=await fixture(),a=await buildRuntime(f),b=await buildRuntime({...f,out:'dist/second'});expect(a.atlasRgbaSha256).toBe(b.atlasRgbaSha256);expect(a.archiveSha256).toBe(b.archiveSha256);for(const name of RUNTIME_FILES)expect(await readFile(join(f.root,f.out,'runtime',name))).toEqual(await readFile(join(f.root,'dist/second/runtime',name)));const zip=await readFile(join(f.root,f.out,'louis-motion-preview.zip'));let entries=0;for(let i=0;i<zip.length-46;i++)if(zip.readUInt32LE(i)===0x02014b50){entries++;expect(zip.readUInt16LE(i+12)).toBe(0);expect(zip.readUInt16LE(i+14)).toBe(0x2821);expect((zip.readUInt32LE(i+38)>>>16)&0o777).toBe(0o644);}expect(entries).toBe(RUNTIME_FILES.length);},30000);
@@ -41,3 +41,16 @@ test('linked artwork terms reject before output',async()=>{
  await expect(buildRuntime(f)).rejects.toThrow('ordinary file');
  expect(await lstat(join(f.root,f.out)).catch(()=>null)).toBeNull();
 });
+
+test('normal builds require licenses before creating output',async()=>{
+ const f=await fixture();
+ await expect(buildRuntime({...f,allowUnlicensedFixtures:false})).rejects.toThrow('Both LICENSE and LICENSE-ARTWORK');
+ expect(await lstat(join(f.root,f.out)).catch(()=>null)).toBeNull();
+});
+
+test('preview sidecars are portable and exclude absolute local paths',async()=>{
+ const f=await fixture();await buildRuntime(f);
+ const body=await readFile(join(f.root,f.out,'runtime/preview.gif.json'),'utf8');
+ expect(JSON.parse(body).output).toBe('preview.gif');
+ expect(body).not.toContain(f.root);
+},30000);

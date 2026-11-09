@@ -3,13 +3,15 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { packageRuntime, RUNTIME_FILES } from "./package";
+import { packageRuntime as packageRelease, RUNTIME_FILES } from "./package";
+import sharp from "sharp";
 import { updateChecksums } from "./update-checksums";
 import { previewInstaller } from "./stage-review-package";
 
 const repo=join(import.meta.dir,"../fixtures/runtime");
 const sha=(b:Uint8Array)=>createHash("sha256").update(b).digest("hex");
 const license="Fixture-only license text. This is not a release license.\n";
+const packageRuntime=(output:string,root:string,options:Parameters<typeof packageRelease>[2]={})=>packageRelease(output,root,{allowUnlicensedFixtures:true,...options});
 // Both terms are synthetic in transport fixtures; release builders copy canonical texts.
 let dir:string;
 beforeAll(async()=>{dir=await mkdtemp(join(tmpdir(),"louis-package-test-"));});
@@ -161,4 +163,61 @@ test("artwork terms cannot be silently dropped or replaced with a dangling link"
  await symlink(join(source,"missing-art-terms"),join(source,"LICENSE-ARTWORK"));
  await expect(packageRuntime(output,source)).rejects.toThrow("Unsafe optional runtime file: LICENSE-ARTWORK");
  expect(await Bun.file(output).exists()).toBe(false);
+});
+
+test("release packaging requires both nonblank license texts by default",async()=>{
+  const source=await fixture(),output=join(source,"release.zip");
+  await expect(packageRelease(output,source)).rejects.toThrow("Both LICENSE and LICENSE-ARTWORK");
+  for(const name of ["LICENSE","LICENSE-ARTWORK"])await writeFile(join(source,name)," \n");
+  await updateChecksums(source);
+  await expect(packageRelease(output,source)).rejects.toThrow("Both LICENSE and LICENSE-ARTWORK");
+  expect(await Bun.file(output).exists()).toBe(false);
+});
+
+test("licensed release packaging preserves sprite bytes and decoded pixels",async()=>{
+  const source=await fixture(true),output=join(source,"release.zip"),bytes=await readFile(join(source,"spritesheet.webp"));
+  const result=await packageRelease(output,source);
+  await unzip(["-q",output,"-d",join(source,"accepted")]);
+  expect(await readFile(join(source,"accepted/spritesheet.webp"))).toEqual(bytes);
+  const pixels=await sharp(bytes).ensureAlpha().toColourspace("srgb").raw().toBuffer();
+  expect(result.manifest.pet.atlasRgbaSha256).toBe(sha(pixels));
+});
+
+for(const kind of ["png","xmp","trailing"] as const)test(`release packaging rejects ${kind} sprite bytes with fresh checksums`,async()=>{
+  const source=await fixture(true),output=join(source,"bad.zip"),path=join(source,"spritesheet.webp"),bytes=await readFile(path);
+  const changed=kind==="png"?await sharp(bytes).png().toBuffer():kind==="xmp"?await sharp(bytes).withXmp('<x:xmpmeta xmlns:x="adobe:ns:meta/">fixture-only metadata</x:xmpmeta>').webp({lossless:true}).toBuffer():Buffer.concat([bytes,Buffer.from("fixture-only trailing data")]);
+  await writeFile(path,changed);await updateChecksums(source);
+  await expect(packageRelease(output,source)).rejects.toThrow(/WebP|metadata/);
+  expect(await Bun.file(output).exists()).toBe(false);
+});
+
+for(const kind of ["duplicate","non-ASCII"] as const)test(`release packaging rejects ${kind} WebP chunks`,async()=>{
+  const source=await fixture(true),output=join(source,"bad.zip"),path=join(source,"spritesheet.webp"),bytes=await readFile(path);
+  const chunk=kind==="duplicate"?Buffer.from(bytes.subarray(12)):Buffer.alloc(10);
+  if(kind==="non-ASCII"){chunk[0]=0xc1;chunk.write("LPH",1,"latin1");chunk.writeUInt32LE(2,4);}
+  const changed=Buffer.concat([bytes,chunk]);changed.writeUInt32LE(changed.length-8,4);
+  await writeFile(path,changed);await updateChecksums(source);
+  await expect(packageRelease(output,source)).rejects.toThrow("Atlas contains embedded metadata or unsupported WebP chunks");
+  expect(await Bun.file(output).exists()).toBe(false);
+});
+
+test("release packaging rejects a second lossy VP8 bitstream with fresh checksums",async()=>{
+  const source=await fixture(true),output=join(source,"mixed.zip"),path=join(source,"spritesheet.webp"),bytes=await readFile(path);
+  expect(bytes.toString("latin1",12,16)).toBe("VP8L");
+  const lossy=await sharp({create:{width:16,height:16,channels:3,background:{r:80,g:130,b:190}}}).webp({lossless:false}).toBuffer();
+  expect(lossy.toString("latin1",12,16)).toBe("VP8 ");
+  const length=lossy.readUInt32LE(16),vp8=lossy.subarray(12,20+length+(length%2));
+  const mixed=Buffer.concat([bytes,vp8]);mixed.writeUInt32LE(mixed.length-8,4);
+  await writeFile(path,mixed);await updateChecksums(source);
+  await expect(packageRelease(output,source)).rejects.toThrow("Atlas contains embedded metadata or unsupported WebP chunks");
+  expect(await Bun.file(output).exists()).toBe(false);
+});
+
+for(const kind of ["malformed","truncated","comment","trailing"] as const)test(`release packaging rejects ${kind} previews with fresh checksums`,async()=>{
+  const source=await fixture(true),output=join(source,"bad.zip"),path=join(source,"preview.gif"),bytes=await readFile(path);
+  const comment=Buffer.from([0x21,0xfe,3,65,66,67,0]);
+  const changed=kind==="malformed"?Buffer.from("not a GIF"):kind==="truncated"?bytes.subarray(0,-1):kind==="comment"?Buffer.concat([bytes.subarray(0,-1),comment,bytes.subarray(-1)]):Buffer.concat([bytes,Buffer.from("fixture-only trailing data")]);
+  await writeFile(path,changed);await updateChecksums(source);
+  await expect(packageRelease(output,source)).rejects.toThrow("Preview must be a complete GIF");
+  expect(await Bun.file(output).exists()).toBe(false);
 });

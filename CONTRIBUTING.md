@@ -24,6 +24,16 @@ bun run build -- --atlas assets/atlas.webp --sha256 919fb8346bb1e45ecffedf88b062
 
 The output contains the runtime ZIP, checksums, and a build record. Building does not install or select a pet.
 
+Builds and direct packaging require both nonblank license texts. Runtime media is
+validated at both entry points: static WebP artwork without embedded metadata,
+and a fully decodable GIF preview without comments or custom application data.
+Accepted sprite bytes are copied unchanged. Generated preview sidecars use a
+relative filename and remain outside the runtime ZIP.
+
+Synthetic transport tests explicitly use the API-only `allowUnlicensedFixtures`
+option. Never use that option for a release; neither CLI exposes it. The privacy
+checks are safeguards, not proof that artwork or free text contains no private data.
+
 Use `--id louis-motion-preview` and a new output folder for a separate local test package. Use temporary folders for installer tests.
 
 ## Artwork changes

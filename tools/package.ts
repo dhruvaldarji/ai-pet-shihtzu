@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
-import { chmod, copyFile, link, lstat, mkdtemp, readFile, readdir, rm, utimes, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdtemp, readFile, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { contract, decode, validateAtlas } from "./pet";
+import { validatePreview } from "./media";
 
 export const RUNTIME_FILES = [".gitignore","README.md","RELEASE_NOTES.md","pet.json","spritesheet.webp","preview.gif","install.sh","uninstall.sh","SHA256SUMS"] as const;
 export const OPTIONAL_RUNTIME_FILES = ["LICENSE","LICENSE-ARTWORK"] as const;
@@ -76,14 +76,14 @@ async function verifyFiles(root:string) {
   return {files,sums,names,dataFiles};
 }
 
-async function verifyPet(root:string,expectedId:RuntimePetId) {
-  const pet=JSON.parse(await readFile(join(root,"pet.json"),"utf8")) as Record<string,unknown>;
+async function verifyPet(files:Map<string,Buffer>,expectedId:RuntimePetId) {
+  const pet=JSON.parse(files.get("pet.json")!.toString("utf8")) as Record<string,unknown>;
   if(pet.id!==expectedId||pet.spriteVersionNumber!==2||pet.spritesheetPath!=="spritesheet.webp"||
     typeof pet.displayName!=="string"||!pet.displayName.trim()||typeof pet.description!=="string"||
     !pet.description.trim()||/[\r\n]/.test(pet.description)) {
     throw new Error(`pet.json must identify ${expectedId}, use sprite v2, and provide a one-line story`);
   }
-  const c=await contract(),atlas=await decode(join(root,"spritesheet.webp"),c);
+  const c=await contract(),atlas=await decode(files.get("spritesheet.webp")!,c);
   const validation=validateAtlas(atlas,c);
   if(!validation.valid) throw new Error(`Invalid runtime atlas: ${validation.problems.join("; ")}`);
   return {id:pet.id,spriteVersionNumber:pet.spriteVersionNumber,atlasRgbaSha256:sha(atlas.pixels)};
@@ -99,13 +99,17 @@ function verifyInstallerTargets(files:Map<string,Buffer>,id:RuntimePetId) {
   }
 }
 
-export async function packageRuntime(output:string,root=join(import.meta.dir,".."),options:{petId?:RuntimePetId}={}) {
+export async function packageRuntime(output:string,root=join(import.meta.dir,".."),options:{petId?:RuntimePetId;allowUnlicensedFixtures?:boolean}={}) {
   const source=resolve(root),archive=resolve(output);
   const id=runtimePetId(options.petId??"louis");
   if(!archive.toLowerCase().endsWith(".zip")) throw new Error("Output must be a .zip path");
   if(await lstat(archive).catch(()=>null)) throw new Error(`Output already exists: ${archive}`);
   const {files,sums,names,dataFiles}=await verifyFiles(source);
-  const pet=await verifyPet(source,id);
+  if(!options.allowUnlicensedFixtures&&["LICENSE","LICENSE-ARTWORK"].some(name=>!files.get(name)?.toString("utf8").trim())) {
+    throw new Error("Both LICENSE and LICENSE-ARTWORK are required for release packaging");
+  }
+  const pet=await verifyPet(files,id);
+  await validatePreview(files.get("preview.gif")!);
   verifyInstallerTargets(files,id);
   const stage=await mkdtemp(join(dirname(archive),".louis-package-"));
   try {
@@ -114,7 +118,7 @@ export async function packageRuntime(output:string,root=join(import.meta.dir,"..
     const timestamp=new Date("2000-01-01T00:00:00.000Z");
     for(const name of names) {
       const staged=join(stage,name);
-      await copyFile(join(source,name),staged,constants.COPYFILE_EXCL);
+      await writeFile(staged,files.get(name)!,{flag:"wx"});
       await chmod(staged,0o644);
       await utimes(staged,timestamp,timestamp);
     }
