@@ -1,0 +1,173 @@
+import { createHash } from "node:crypto";
+import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { validatePreview, validateWebp } from "./media";
+
+const repo = resolve(import.meta.dir, "..");
+const approvedMedia = new Set([
+  "assets/atlas.webp",
+  "fixtures/runtime/spritesheet.webp",
+  "fixtures/runtime/preview.gif",
+]);
+
+export function checkTrackedPaths(paths: string[]) {
+  for (const path of paths) {
+    if (
+      /(?:^|\/)(?:private|pet-backups|node_modules|dist|\.quality-bin)(?:\/|$)/i.test(path) ||
+      /(?:^|\/)(?:\.env(?:\..*)?|id_rsa|id_ed25519)$/i.test(path) ||
+      /\.(?:pem|key|p12|pfx|zip|tar|gz)$/i.test(path)
+    )
+      throw new Error("Tracked-file privacy policy failed");
+    if (
+      /\.(?:webp|gif|png|jpe?g|heic|tiff?|bmp|svg|ico)$/i.test(path) &&
+      !approvedMedia.has(path)
+    ) {
+      throw new Error("Unapproved tracked media");
+    }
+  }
+}
+
+export function checkActionPins(workflow: unknown) {
+  const seen = new Set<object>();
+  function visit(value: unknown) {
+    if (!value || typeof value !== "object" || seen.has(value)) return;
+    seen.add(value);
+    for (const [key, child] of Object.entries(value)) {
+      if (
+        key === "uses" &&
+        (typeof child !== "string" || !/^[\w.-]+\/[\w./-]+@[a-f0-9]{40}$/.test(child))
+      ) {
+        throw new Error("Workflow actions must use full commit SHA pins");
+      }
+      visit(child);
+    }
+  }
+  visit(workflow);
+}
+
+function git(root: string, ...args: string[]) {
+  const result = Bun.spawnSync(["git", "-C", root, ...args], { stdout: "pipe", stderr: "pipe" });
+  if (result.exitCode !== 0) throw new Error("Cannot inspect security scan history");
+  return result.stdout.toString();
+}
+
+export async function scanSecrets(root: string) {
+  if (git(root, "rev-parse", "--is-shallow-repository").trim() !== "false") {
+    throw new Error("Secret scanning requires complete fetched history");
+  }
+  const binary = join(repo, ".quality-bin/gitleaks");
+  const version = Bun.spawnSync([binary, "version"], { stdout: "pipe", stderr: "pipe" });
+  if (version.exitCode !== 0 || version.stdout.toString().trim() !== "8.24.3") {
+    throw new Error("Run setup:security for pinned Gitleaks");
+  }
+  const temporary = await mkdtemp(join(tmpdir(), "louis-secret-scan-"));
+  try {
+    const config = join(temporary, "gitleaks.toml");
+    const ignore = join(temporary, "empty-ignore");
+    const template = join(temporary, "empty-git-template");
+    const history = join(temporary, "history.git");
+    await mkdir(template, { mode: 0o700 });
+    await writeFile(config, "[extend]\nuseDefault = true\n", { mode: 0o600 });
+    await writeFile(ignore, "", { mode: 0o600 });
+    const environment = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.startsWith("GITLEAKS_")),
+    );
+    const mirror = Bun.spawnSync(
+      [
+        "git",
+        "clone",
+        "--mirror",
+        "--no-hardlinks",
+        `--template=${template}`,
+        resolve(root),
+        history,
+      ],
+      { cwd: temporary, env: environment, stdout: "pipe", stderr: "pipe" },
+    );
+    if (mirror.exitCode !== 0) throw new Error("Cannot prepare private history scan");
+    const flags = [
+      "--config",
+      config,
+      "--gitleaks-ignore-path",
+      ignore,
+      "--ignore-gitleaks-allow",
+      "--redact=100",
+      "--no-banner",
+      "--no-color",
+      "--exit-code=10",
+    ];
+    const canary = Buffer.from(
+      `token = "${["ghp", "0123456789abcdefghijklmnopqrstuvwxyz"].join("_")}"\n`,
+    );
+    const probe = Bun.spawnSync([binary, "stdin", ...flags], {
+      cwd: temporary,
+      env: environment,
+      stdin: canary,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (probe.exitCode !== 10) throw new Error("Secret scanner canary was not detected");
+    const result = Bun.spawnSync(
+      [
+        binary,
+        "git",
+        "--log-opts=--all --full-history --diff-merges=first-parent",
+        ...flags,
+        history,
+      ],
+      { cwd: temporary, env: environment, stdout: "pipe", stderr: "pipe" },
+    );
+    if (result.exitCode !== 0) {
+      throw new Error(
+        result.exitCode === 10
+          ? "Secret scan found potential credentials; inspect privately"
+          : "Secret scan could not complete",
+      );
+    }
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+}
+
+export async function checkSourceSecurity(root = repo) {
+  const paths = git(root, "ls-files", "-z").split("\0").filter(Boolean);
+  checkTrackedPaths(paths);
+  for (const path of paths) {
+    const info = await lstat(join(root, path));
+    if (!info.isFile() || info.isSymbolicLink())
+      throw new Error("Tracked sources must be ordinary files");
+    if (path.startsWith(".github/workflows/") && /\.ya?ml$/.test(path)) {
+      checkActionPins(Bun.YAML.parse(await readFile(join(root, path), "utf8")));
+    }
+    if (approvedMedia.has(path)) {
+      const bytes = await readFile(join(root, path));
+      if (path.endsWith(".webp")) await validateWebp(bytes);
+      else await validatePreview(bytes);
+    }
+  }
+  const source = JSON.parse(await readFile(join(root, "SOURCE_INPUT.json"), "utf8"));
+  if (source.version !== 1 || source.atlas?.path !== "assets/atlas.webp")
+    throw new Error("Invalid production source binding");
+  const atlas = await readFile(join(root, "assets/atlas.webp"));
+  const digest = createHash("sha256").update(atlas).digest("hex");
+  if (
+    digest !== source.atlas.sha256 ||
+    atlas.equals(await readFile(join(root, "fixtures/runtime/spritesheet.webp")))
+  ) {
+    throw new Error("Production source hash or fixture boundary failed");
+  }
+}
+
+if (import.meta.main) {
+  try {
+    await checkSourceSecurity();
+    await scanSecrets(repo);
+    console.log(
+      "Security checks passed: fetched history, tracked files, action pins and approved media",
+    );
+  } catch {
+    console.error("Security checks failed; inspect privately. No findings or paths are printed.");
+    process.exitCode = 1;
+  }
+}
