@@ -131,6 +131,15 @@ test("a checksum cannot widen the runtime allowlist", async () => {
   expect(await Bun.file(output).exists()).toBe(false);
 });
 
+test("synthetic secret markers cannot enter publication text", async () => {
+  const source = await fixture(true);
+  const output = join(source, "bad.zip");
+  await writeFile(join(source, "LICENSE-ARTWORK"), ["ghp", "a".repeat(36)].join("_"));
+  await updateChecksums(source);
+  await expect(packageRuntime(output, source)).rejects.toThrow("contains a secret marker");
+  expect(await Bun.file(output).exists()).toBe(false);
+});
+
 test("optional LICENSE receives the runtime text privacy check", async () => {
   const source = await fixture(true),
     output = join(source, "bad.zip");

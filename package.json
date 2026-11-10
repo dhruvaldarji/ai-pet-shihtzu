@@ -6,16 +6,20 @@
     "build": "bun tools/build.ts",
     "test": "bun test tools --timeout 30000",
     "check:setup": "bun tools/check-dependencies.ts",
-    "check:production": "bun test checks --timeout 60000",
+    "check:production": "bun test checks/production.test.ts --timeout 60000",
     "check:pr": "bun tools/pr-policy.ts",
     "check:types": "tsc --noEmit",
     "check:format": "biome format .",
     "check:lint": "biome lint --error-on-warnings .",
     "format": "biome check --write .",
     "setup:quality": "sh tools/install-quality-tools.sh",
-    "check:shell": ".quality-bin/shellcheck --shell=sh install.sh uninstall.sh tools/install-quality-tools.sh",
+    "check:shell": ".quality-bin/shellcheck --shell=sh install.sh uninstall.sh tools/install-quality-tools.sh tools/install-security-tools.sh",
     "check:workflows": "PATH=\"$PWD/.quality-bin:$PATH\" .quality-bin/actionlint",
-    "check:quality": "bun run check:types && bun run check:format && bun run check:lint && bun run check:shell && bun run check:workflows"
+    "check:quality": "bun run check:types && bun run check:format && bun run check:lint && bun run check:shell && bun run check:workflows",
+    "setup:security": "sh tools/install-security-tools.sh",
+    "check:security-history": "bun test checks/security.test.ts --timeout 30000",
+    "check:security": "bun tools/security.ts",
+    "check:dependencies": "bun audit --audit-level=high"
   },
   "dependencies": {
     "sharp": "0.35.5"

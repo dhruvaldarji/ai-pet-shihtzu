@@ -31,6 +31,8 @@ Biome formats and lints `tools/**/*.ts`, `checks/**/*.ts`, root JSON files, and 
 
 ## Build a package
 
+Before requesting review, run `bun run setup:security`, `bun run check:security-history`, `bun run check:security`, and `bun run check:dependencies` as well as quality and package checks. Fetch full history before the security scan (CI uses `fetch-depth: 0`). The history regression test uses temporary local clones and the pinned scanner; Gitleaks downloads use the same platform support and local `.quality-bin/` directory as quality tools. See [SECURITY.md](SECURITY.md) for mirror isolation, redaction, and coverage limits. Never upload a raw scan report. Dependency and action updates go through ordinary reviewed PRs; automated updates are proposals, not merge approval.
+
 The builder copies the sprite sheet without redrawing or recompressing it. Supply the hash from `SOURCE_INPUT.json`.
 
 ```sh
@@ -81,7 +83,7 @@ The read-only `pr-policy` check validates both the PR title and actual commit su
 
 Source CI runs on all PR base branches and pushes to `main`, not both branch pushes and PR events. Superseded runs are cancelled per PR; the required `test` status remains unchanged.
 
-Wait for `test` and both `production-artifact` checks to pass. Resolve each review thread before merge.
+Wait for `test`, `quality`, `security`, and both `production-artifact` checks to pass. Resolve each review thread before merge.
 
 Include exact commands, results, and anything not tested. Run `git diff --check` as well as affected tests. For user-facing guidance, check links and ensure generated package instructions agree with the source documentation. For app claims, record the tested app/version and platform; local filesystem tests alone do not prove playback. Maintainer approval is required to merge or publish; passing CI is not approval.
 
