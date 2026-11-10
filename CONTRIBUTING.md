@@ -17,9 +17,17 @@ Use Bun 1.3.10. You also need `zip`, `unzip`, a POSIX shell, and a SHA256 comman
 ```sh
 bun install --frozen-lockfile
 bun run check:setup
+bun run setup:quality
+bun run check:quality
 bun test tools --timeout 30000
 bun run check:production
 ```
+
+Quality tooling is pinned to Biome 2.2.6, TypeScript 5.9.3, `@types/bun` 1.3.10, ShellCheck 0.10.0, and actionlint 1.7.7. `bun run setup:quality` downloads the ShellCheck and actionlint binaries into the ignored `.quality-bin/` directory; it requires `curl`, `tar`, `gzip`, `xz`, `mktemp`, and a SHA256 utility (`sha256sum`, `shasum`, or `sha256`). No system-wide install or elevated permission is used.
+
+The ShellCheck and actionlint versions and artifact hashes are pinned in `tools/install-quality-tools.sh`. actionlint hashes come from its official release checksum file. ShellCheck hashes are pinned from the official HTTPS release archives; upstream does not publish a checksum or signature for those archives, so the pinned hashes are not represented as upstream signatures.
+
+Biome formats and lints `tools/**/*.ts`, `checks/**/*.ts`, root JSON files, and `tools/*.json`. It intentionally excludes assets, fixtures, and generated `dist/` output. TypeScript checks the same source and test trees without emitting files. ShellCheck checks the installer scripts and quality-tool installer; actionlint checks GitHub workflows and uses the pinned ShellCheck binary for embedded shell.
 
 ## Build a package
 

@@ -16,7 +16,7 @@ if [ ! -e "$louis_root" ] && [ ! -L "$louis_root" ]; then
   printf '%s\n' "Louis is not installed."
   exit 0
 fi
-louis_root=$(CDPATH= cd -P "$louis_root" && printf '%s/' "$PWD")
+louis_root=$(CDPATH='' cd -P "$louis_root" && printf '%s/' "$PWD")
 louis_root=${louis_root%/}
 louis_target="$louis_root/pets/louis"
 louis_lock="$louis_root/.louis-lock"
