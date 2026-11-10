@@ -1,42 +1,190 @@
 #!/usr/bin/env bun
 /** Assemble a candidate package from an explicit atlas. Never install or publish. */
-import {createHash} from 'node:crypto';
-import {copyFile,lstat,mkdir,readFile,writeFile} from 'node:fs/promises';
-import {dirname,join,relative,resolve,sep} from 'node:path';
-import {contract,decode,preview,validateAtlas} from './pet';
-import {packageRuntime,runtimePetId,type RuntimePetId} from './package';
-import {previewInstaller} from './stage-review-package';
-import {updateChecksums} from './update-checksums';
+import { createHash } from "node:crypto";
+import { copyFile, lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { packageRuntime, type RuntimePetId, runtimePetId } from "./package";
+import { contract, decode, preview, validateAtlas } from "./pet";
+import { previewInstaller } from "./stage-review-package";
+import { updateChecksums } from "./update-checksums";
 
-const sha=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex');
-async function ordinary(path:string){const s=await lstat(path);if(!s.isFile()||s.isSymbolicLink())throw Error('Input must be an ordinary file');return readFile(path);}
-export async function buildRuntime(options:{atlas:string;sha256:string;out:string;id:RuntimePetId;root?:string;allowUnlicensedFixtures?:boolean}){
- const root=resolve(options.root??join(import.meta.dir,'..')),atlas=resolve(root,options.atlas),out=resolve(root,options.out),id=runtimePetId(options.id);
- if(!/^[a-f0-9]{64}$/.test(options.sha256))throw Error('Expected atlas SHA256 is required');
- const rel=relative(join(root,'dist'),out);
- if(!rel||rel==='..'||rel.startsWith('..'+sep)||resolve(out)===resolve(atlas)||rel.startsWith(sep))throw Error('Output must be a new folder below dist');
- let current=root;
- for(const part of relative(root,out).split(sep)){current=join(current,part);const s=await lstat(current).catch((e:NodeJS.ErrnoException)=>{if(e.code==='ENOENT')return null;throw e;});if(s?.isSymbolicLink()||(s&&!s.isDirectory()))throw Error('Output cannot follow a link or file');if(s&&current===out)throw Error('Output already exists');}
- const bytes=await ordinary(atlas);
- if(sha(bytes)!==options.sha256)throw Error('Atlas SHA256 mismatch');
- const c=await contract(),decoded=await decode(bytes,c),validation=validateAtlas(decoded,c);
- if(!validation.valid)throw Error('Invalid atlas: '+validation.problems.join('; '));
- const licenses: {name:string;bytes:Buffer}[]=[];
- for(const name of ['LICENSE','LICENSE-ARTWORK']){const p=join(root,name),stat=await lstat(p).catch((e:NodeJS.ErrnoException)=>{if(e.code==='ENOENT')return null;throw e;});if(stat){const bytes=await ordinary(p);if(!bytes.toString().trim())throw Error('Empty license: '+name);licenses.push({name,bytes});}}
- if(licenses.length!==2&&!(licenses.length===0&&options.allowUnlicensedFixtures))throw Error('Both LICENSE and LICENSE-ARTWORK are required together');
- const scripts=await Promise.all(['install.sh','uninstall.sh'].map(async name=>({name,body:(await ordinary(join(root,name))).toString()})));
- await mkdir(dirname(out),{recursive:true});await mkdir(out);const runtime=join(out,'runtime');await mkdir(runtime);
- const name=id==='louis'?'Louis':'Louis Motion Preview',story='Louis rules the day with tiny acts of mischief and very important naps.';
- await writeFile(join(runtime,'spritesheet.webp'),bytes,{flag:'wx'});
- await writeFile(join(runtime,'pet.json'),JSON.stringify({id,displayName:name,description:story,spriteVersionNumber:2,spritesheetPath:'spritesheet.webp'},null,2)+'\n',{flag:'wx'});
- for(const script of scripts)await writeFile(join(runtime,script.name),id==='louis'?script.body:previewInstaller(script.body),{flag:'wx'});
- await copyFile(join(root,'.gitignore'),join(runtime,'.gitignore'));
- for(const license of licenses)await writeFile(join(runtime,license.name),license.bytes,{flag:'wx'});
- await writeFile(join(runtime,'README.md'),"# {{name}}\n\n{{story}}\n\n![Louis animation preview](preview.gif)\n\n## Local installation\n\nThis is a pet package, not a required plugin. Verify the ZIP against the publisher's checksum before extraction, then verify the extracted SHA256SUMS. Checksums detect changed bytes, not publisher identity.\n\nRun `sh install.sh` in the extracted folder. The target is `<root>/pets/{{id}}`; root precedence is `LOUIS_CODEX_DIR`, then `CODEX_HOME`, then `$HOME/.codex`. Use the first nonempty value and the same root for every operation. The installer checks the package and keeps a backup before replacing an existing local pet. Check selection and appearance in the app afterwards.\n\n## Update, uninstall, and restore\n\nUpdates are user-requested: verify the newer package, then run its installer for the same root and pet ID. There is no background updater or automatic release download. An identical payload is a no-op without a new backup. Changed payloads preserve custom files and save the complete previous pet under `pet-backups` before replacement. A failed replacement attempts rollback and reports retained recovery paths if needed. Other pets are unchanged.\n\nRun `sh uninstall.sh` to remove the local pet and keep a backup. Repeated removal is a no-op. To restore, close the app, stop other pet operations, preserve any current pet by uninstalling it first, then copy the complete `{{id}}` folder from your chosen backup to the now-absent `<root>/pets/{{id}}` path. The destination must not be a symbolic link. Do not overwrite or merge folders. Keep the backup until you reopen the app and verify the restored pet.\n\nThe selected root may resolve through directory aliases, but `pets`, `pet-backups`, and the pet target must not be symbolic links. Install and uninstall share a `.{{id}}-lock` directory in the root. A competing operation fails without changing the pet. After a crash, remove an empty stale lock with `rmdir` only after confirming no operation is active; never bypass an active lock or edit managed folders concurrently.\n\n## Compatibility and privacy\n\nThis package uses sprite format v2. The local scripts target POSIX environments such as macOS and Linux. Native playback and direct-install links remain unverified. Windows and ChatGPT web/cloud upload are not supported by this guidance. Do not upload this sheet without separate format and live-flow acceptance. Local file installation does not prove visible playback or cloud delivery.\n\nThe bundled scripts have no telemetry or upload calls. They write local files and backups; keep backups private. The host app, agents, downloads, and dependency services have their own privacy policies.\n\n## Files and behavior\n\n`pet.json` and `spritesheet.webp` are the local pet files. The app controls animation timing and may skip the first-use wave.\n\nThe preview GIF uses fewer colors. Use the sprite sheet to check the exact artwork.\n\nSoftware terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.\n".replaceAll("{{name}}",name).replaceAll("{{story}}",story).replaceAll("{{id}}",id).replaceAll("{{atlasSha256}}",options.sha256).replace("Software terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.",licenses.length?"Software terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.":"No license terms were supplied with this build."),{flag:'wx'});
- await writeFile(join(runtime,'RELEASE_NOTES.md'),"# {{name}}\n\nLouis naps, travels, reacts while you work, and follows your cursor.\n\n## Package details\n\n- Pet ID: `{{id}}`\n- Sprite format: 2\n- Sprite sheet SHA256: `{{atlasSha256}}`\n\nThe package keeps the source sprite sheet unchanged. The app controls animation timing. Its first-use wave may not appear or replay when you select Louis again.\n\nThe local installer saves a backup before replacing existing files. Native playback and direct-install links remain unverified. Windows and ChatGPT web/cloud upload are not supported by this guidance. A local installation does not update a cloud pet.\n\nSoftware terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.\n".replaceAll("{{name}}",name).replaceAll("{{story}}",story).replaceAll("{{id}}",id).replaceAll("{{atlasSha256}}",options.sha256).replace("Software terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.",licenses.length?"Software terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.":"No license terms were supplied with this build."),{flag:'wx'});
- await preview(join(runtime,'spritesheet.webp'),'idle',join(runtime,'preview.gif'),192);await updateChecksums(runtime);
- const packaged=await packageRuntime(join(out,id+'.zip'),runtime,{petId:id,allowUnlicensedFixtures:options.allowUnlicensedFixtures});
- const receipt={version:1,status:'candidate-package-awaiting-review',atlasSha256:options.sha256,atlasRgbaSha256:sha(decoded.pixels),petId:id,payload:packaged.manifest,archiveSha256:packaged.archiveSha256,installed:false,published:false,artworkAccepted:false,licensePresent:licenses.length===2,licenseFiles:licenses.map(x=>x.name)};
- await writeFile(join(out,'build.json'),JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});return receipt;
+const sha = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
+async function ordinary(path: string) {
+  const s = await lstat(path);
+  if (!s.isFile() || s.isSymbolicLink()) throw Error("Input must be an ordinary file");
+  return readFile(path);
 }
-if(import.meta.main){try{const args=process.argv.slice(2);if(args[0]==='--')args.shift();const p:Record<string,string>={};for(let i=0;i<args.length;i+=2){if(!['--atlas','--sha256','--out','--id'].includes(args[i])||!args[i+1]||p[args[i]])throw Error('Usage: build --atlas file --sha256 hash --out dist/new-folder --id louis|louis-motion-preview');p[args[i]]=args[i+1];}if(Object.keys(p).length!==4)throw Error('All four build inputs are required');console.log(JSON.stringify(await buildRuntime({atlas:p['--atlas'],sha256:p['--sha256'],out:p['--out'],id:runtimePetId(p['--id'])}),null,2));}catch(e){console.error(JSON.stringify({error:(e as Error).message}));process.exitCode=1;}}
+export async function buildRuntime(options: {
+  atlas: string;
+  sha256: string;
+  out: string;
+  id: RuntimePetId;
+  root?: string;
+  allowUnlicensedFixtures?: boolean;
+}) {
+  const root = resolve(options.root ?? join(import.meta.dir, "..")),
+    atlas = resolve(root, options.atlas),
+    out = resolve(root, options.out),
+    id = runtimePetId(options.id);
+  if (!/^[a-f0-9]{64}$/.test(options.sha256)) throw Error("Expected atlas SHA256 is required");
+  const rel = relative(join(root, "dist"), out);
+  if (
+    !rel ||
+    rel === ".." ||
+    rel.startsWith(".." + sep) ||
+    resolve(out) === resolve(atlas) ||
+    rel.startsWith(sep)
+  )
+    throw Error("Output must be a new folder below dist");
+  let current = root;
+  for (const part of relative(root, out).split(sep)) {
+    current = join(current, part);
+    const s = await lstat(current).catch((e: NodeJS.ErrnoException) => {
+      if (e.code === "ENOENT") return null;
+      throw e;
+    });
+    if (s?.isSymbolicLink() || (s && !s.isDirectory()))
+      throw Error("Output cannot follow a link or file");
+    if (s && current === out) throw Error("Output already exists");
+  }
+  const bytes = await ordinary(atlas);
+  if (sha(bytes) !== options.sha256) throw Error("Atlas SHA256 mismatch");
+  const c = await contract(),
+    decoded = await decode(bytes, c),
+    validation = validateAtlas(decoded, c);
+  if (!validation.valid) throw Error("Invalid atlas: " + validation.problems.join("; "));
+  const licenses: { name: string; bytes: Buffer }[] = [];
+  for (const name of ["LICENSE", "LICENSE-ARTWORK"]) {
+    const p = join(root, name),
+      stat = await lstat(p).catch((e: NodeJS.ErrnoException) => {
+        if (e.code === "ENOENT") return null;
+        throw e;
+      });
+    if (stat) {
+      const bytes = await ordinary(p);
+      if (!bytes.toString().trim()) throw Error("Empty license: " + name);
+      licenses.push({ name, bytes });
+    }
+  }
+  if (licenses.length !== 2 && !(licenses.length === 0 && options.allowUnlicensedFixtures))
+    throw Error("Both LICENSE and LICENSE-ARTWORK are required together");
+  const scripts = await Promise.all(
+    ["install.sh", "uninstall.sh"].map(async (name) => ({
+      name,
+      body: (await ordinary(join(root, name))).toString(),
+    })),
+  );
+  await mkdir(dirname(out), { recursive: true });
+  await mkdir(out);
+  const runtime = join(out, "runtime");
+  await mkdir(runtime);
+  const name = id === "louis" ? "Louis" : "Louis Motion Preview",
+    story = "Louis rules the day with tiny acts of mischief and very important naps.";
+  await writeFile(join(runtime, "spritesheet.webp"), bytes, { flag: "wx" });
+  await writeFile(
+    join(runtime, "pet.json"),
+    JSON.stringify(
+      {
+        id,
+        displayName: name,
+        description: story,
+        spriteVersionNumber: 2,
+        spritesheetPath: "spritesheet.webp",
+      },
+      null,
+      2,
+    ) + "\n",
+    { flag: "wx" },
+  );
+  for (const script of scripts)
+    await writeFile(
+      join(runtime, script.name),
+      id === "louis" ? script.body : previewInstaller(script.body),
+      { flag: "wx" },
+    );
+  await copyFile(join(root, ".gitignore"), join(runtime, ".gitignore"));
+  for (const license of licenses)
+    await writeFile(join(runtime, license.name), license.bytes, { flag: "wx" });
+  await writeFile(
+    join(runtime, "README.md"),
+    "# {{name}}\n\n{{story}}\n\n![Louis animation preview](preview.gif)\n\n## Local installation\n\nThis is a pet package, not a required plugin. Verify the ZIP against the publisher's checksum before extraction, then verify the extracted SHA256SUMS. Checksums detect changed bytes, not publisher identity.\n\nRun `sh install.sh` in the extracted folder. The target is `<root>/pets/{{id}}`; root precedence is `LOUIS_CODEX_DIR`, then `CODEX_HOME`, then `$HOME/.codex`. Use the first nonempty value and the same root for every operation. The installer checks the package and keeps a backup before replacing an existing local pet. Check selection and appearance in the app afterwards.\n\n## Update, uninstall, and restore\n\nUpdates are user-requested: verify the newer package, then run its installer for the same root and pet ID. There is no background updater or automatic release download. An identical payload is a no-op without a new backup. Changed payloads preserve custom files and save the complete previous pet under `pet-backups` before replacement. A failed replacement attempts rollback and reports retained recovery paths if needed. Other pets are unchanged.\n\nRun `sh uninstall.sh` to remove the local pet and keep a backup. Repeated removal is a no-op. To restore, close the app, stop other pet operations, preserve any current pet by uninstalling it first, then copy the complete `{{id}}` folder from your chosen backup to the now-absent `<root>/pets/{{id}}` path. The destination must not be a symbolic link. Do not overwrite or merge folders. Keep the backup until you reopen the app and verify the restored pet.\n\nThe selected root may resolve through directory aliases, but `pets`, `pet-backups`, and the pet target must not be symbolic links. Install and uninstall share a `.{{id}}-lock` directory in the root. A competing operation fails without changing the pet. After a crash, remove an empty stale lock with `rmdir` only after confirming no operation is active; never bypass an active lock or edit managed folders concurrently.\n\n## Compatibility and privacy\n\nThis package uses sprite format v2. The local scripts target POSIX environments such as macOS and Linux. Native playback and direct-install links remain unverified. Windows and ChatGPT web/cloud upload are not supported by this guidance. Do not upload this sheet without separate format and live-flow acceptance. Local file installation does not prove visible playback or cloud delivery.\n\nThe bundled scripts have no telemetry or upload calls. They write local files and backups; keep backups private. The host app, agents, downloads, and dependency services have their own privacy policies.\n\n## Files and behavior\n\n`pet.json` and `spritesheet.webp` are the local pet files. The app controls animation timing and may skip the first-use wave.\n\nThe preview GIF uses fewer colors. Use the sprite sheet to check the exact artwork.\n\nSoftware terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.\n"
+      .replaceAll("{{name}}", name)
+      .replaceAll("{{story}}", story)
+      .replaceAll("{{id}}", id)
+      .replaceAll("{{atlasSha256}}", options.sha256)
+      .replace(
+        "Software terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.",
+        licenses.length
+          ? "Software terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate."
+          : "No license terms were supplied with this build.",
+      ),
+    { flag: "wx" },
+  );
+  await writeFile(
+    join(runtime, "RELEASE_NOTES.md"),
+    "# {{name}}\n\nLouis naps, travels, reacts while you work, and follows your cursor.\n\n## Package details\n\n- Pet ID: `{{id}}`\n- Sprite format: 2\n- Sprite sheet SHA256: `{{atlasSha256}}`\n\nThe package keeps the source sprite sheet unchanged. The app controls animation timing. Its first-use wave may not appear or replay when you select Louis again.\n\nThe local installer saves a backup before replacing existing files. Native playback and direct-install links remain unverified. Windows and ChatGPT web/cloud upload are not supported by this guidance. A local installation does not update a cloud pet.\n\nSoftware terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.\n"
+      .replaceAll("{{name}}", name)
+      .replaceAll("{{story}}", story)
+      .replaceAll("{{id}}", id)
+      .replaceAll("{{atlasSha256}}", options.sha256)
+      .replace(
+        "Software terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate.",
+        licenses.length
+          ? "Software terms are in [LICENSE](LICENSE). Artwork terms are in [LICENSE-ARTWORK](LICENSE-ARTWORK). Dependency licenses remain separate."
+          : "No license terms were supplied with this build.",
+      ),
+    { flag: "wx" },
+  );
+  await preview(join(runtime, "spritesheet.webp"), "idle", join(runtime, "preview.gif"), 192);
+  await updateChecksums(runtime);
+  const packaged = await packageRuntime(join(out, id + ".zip"), runtime, {
+    petId: id,
+    allowUnlicensedFixtures: options.allowUnlicensedFixtures,
+  });
+  const receipt = {
+    version: 1,
+    status: "candidate-package-awaiting-review",
+    atlasSha256: options.sha256,
+    atlasRgbaSha256: sha(decoded.pixels),
+    petId: id,
+    payload: packaged.manifest,
+    archiveSha256: packaged.archiveSha256,
+    installed: false,
+    published: false,
+    artworkAccepted: false,
+    licensePresent: licenses.length === 2,
+    licenseFiles: licenses.map((x) => x.name),
+  };
+  await writeFile(join(out, "build.json"), JSON.stringify(receipt, null, 2) + "\n", { flag: "wx" });
+  return receipt;
+}
+if (import.meta.main) {
+  try {
+    const args = process.argv.slice(2);
+    if (args[0] === "--") args.shift();
+    const p: Record<string, string> = {};
+    for (let i = 0; i < args.length; i += 2) {
+      if (!["--atlas", "--sha256", "--out", "--id"].includes(args[i]) || !args[i + 1] || p[args[i]])
+        throw Error(
+          "Usage: build --atlas file --sha256 hash --out dist/new-folder --id louis|louis-motion-preview",
+        );
+      p[args[i]] = args[i + 1];
+    }
+    if (Object.keys(p).length !== 4) throw Error("All four build inputs are required");
+    console.log(
+      JSON.stringify(
+        await buildRuntime({
+          atlas: p["--atlas"],
+          sha256: p["--sha256"],
+          out: p["--out"],
+          id: runtimePetId(p["--id"]),
+        }),
+        null,
+        2,
+      ),
+    );
+  } catch (e) {
+    console.error(JSON.stringify({ error: (e as Error).message }));
+    process.exitCode = 1;
+  }
+}

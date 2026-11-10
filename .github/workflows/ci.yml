@@ -24,6 +24,19 @@ jobs:
       - run: bun run check:setup
       - run: bun test tools --timeout 30000
       - run: bun audit --audit-level=high
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run setup:quality
+      - run: bun run check:quality
   production-artifact:
     strategy:
       fail-fast: false

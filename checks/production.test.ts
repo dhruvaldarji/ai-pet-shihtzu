@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildRuntime } from "../tools/build";
@@ -26,8 +26,14 @@ async function ordinary(path: string) {
 }
 
 function verifyBinding(candidate: SourceInput, bytes: Buffer) {
-  assert(candidate?.version === 1 && candidate.atlas?.path === "assets/atlas.webp", "Production atlas path must be assets/atlas.webp");
-  assert(typeof candidate.atlas.sha256 === "string" && /^[a-f0-9]{64}$/.test(candidate.atlas.sha256), "Production atlas hash is required");
+  assert(
+    candidate?.version === 1 && candidate.atlas?.path === "assets/atlas.webp",
+    "Production atlas path must be assets/atlas.webp",
+  );
+  assert(
+    typeof candidate.atlas.sha256 === "string" && /^[a-f0-9]{64}$/.test(candidate.atlas.sha256),
+    "Production atlas hash is required",
+  );
   assert.equal(hash(bytes), candidate.atlas.sha256, "Production atlas SHA256 mismatch");
   assert(!bytes.equals(fixture), "Synthetic fixture cannot be the production atlas");
 }
@@ -35,7 +41,9 @@ function verifyBinding(candidate: SourceInput, bytes: Buffer) {
 async function run(argv: string[], env: Record<string, string | undefined> = process.env) {
   const proc = Bun.spawn(argv, { env, stdout: "pipe", stderr: "pipe" });
   const [stdout, , code] = await Promise.all([
-    new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited,
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
   ]);
   // Do not include installer output containing temporary home paths in shared logs.
   assert.equal(code, 0, `${argv[0]} failed during production verification`);
@@ -45,12 +53,20 @@ async function run(argv: string[], env: Record<string, string | undefined> = pro
 beforeAll(async () => {
   input = JSON.parse((await ordinary(join(repo, "SOURCE_INPUT.json"))).toString());
   const assets = await lstat(join(repo, "assets"));
-  assert(assets.isDirectory() && !assets.isSymbolicLink(), "Production assets must be an ordinary directory");
+  assert(
+    assets.isDirectory() && !assets.isSymbolicLink(),
+    "Production assets must be an ordinary directory",
+  );
   atlas = await ordinary(join(repo, "assets/atlas.webp"));
   fixture = await ordinary(join(repo, "fixtures/runtime/spritesheet.webp"));
   verifyBinding(input, atlas);
   workspace = await mkdtemp(join(tmpdir(), "louis-production-"));
-  const sources = await Promise.all([".gitignore", "install.sh", "uninstall.sh", ...OPTIONAL_RUNTIME_FILES].map(async name => ({ name, bytes: await ordinary(join(repo, name)) })));
+  const sources = await Promise.all(
+    [".gitignore", "install.sh", "uninstall.sh", ...OPTIONAL_RUNTIME_FILES].map(async (name) => ({
+      name,
+      bytes: await ordinary(join(repo, name)),
+    })),
+  );
   for (const label of ["first-source", "second-source"]) {
     const root = join(workspace, label);
     sourceRoots.push(root);
@@ -65,16 +81,31 @@ afterAll(async () => {
 });
 
 test("production binding rejects stale hashes, fixture paths, and fixture bytes", () => {
-  expect(() => verifyBinding({ ...input, atlas: { ...input.atlas, sha256: "0".repeat(64) } }, atlas)).toThrow("SHA256 mismatch");
-  expect(() => verifyBinding({ ...input, atlas: { path: "fixtures/runtime/spritesheet.webp", sha256: hash(fixture) } }, fixture)).toThrow("atlas path");
-  expect(() => verifyBinding({ ...input, atlas: { ...input.atlas, sha256: hash(fixture) } }, fixture)).toThrow("Synthetic fixture");
+  expect(() =>
+    verifyBinding({ ...input, atlas: { ...input.atlas, sha256: "0".repeat(64) } }, atlas),
+  ).toThrow("SHA256 mismatch");
+  expect(() =>
+    verifyBinding(
+      { ...input, atlas: { path: "fixtures/runtime/spritesheet.webp", sha256: hash(fixture) } },
+      fixture,
+    ),
+  ).toThrow("atlas path");
+  expect(() =>
+    verifyBinding({ ...input, atlas: { ...input.atlas, sha256: hash(fixture) } }, fixture),
+  ).toThrow("Synthetic fixture");
 });
 
 test("manifest-bound Louis builds reproducibly and survives a temporary local lifecycle", async () => {
-  const options = { atlas: input.atlas.path, sha256: input.atlas.sha256, id: "louis" as const, out: "dist/build" };
+  const options = {
+    atlas: input.atlas.path,
+    sha256: input.atlas.sha256,
+    id: "louis" as const,
+    out: "dist/build",
+  };
   const first = await buildRuntime({ ...options, root: sourceRoots[0] });
   const second = await buildRuntime({ ...options, root: sourceRoots[1] });
-  const firstOut = join(sourceRoots[0], options.out), secondOut = join(sourceRoots[1], options.out);
+  const firstOut = join(sourceRoots[0], options.out),
+    secondOut = join(sourceRoots[1], options.out);
   expect(first).toEqual(second);
   const record = await ordinary(join(firstOut, "build.json"));
   expect(record).toEqual(await ordinary(join(secondOut, "build.json")));
@@ -96,18 +127,24 @@ test("manifest-bound Louis builds reproducibly and survives a temporary local li
   await run(["unzip", "-q", zip, "-d", extracted]);
   expect((await readdir(extracted)).sort()).toEqual(names);
   for (const name of names) {
-    expect(await ordinary(join(extracted, name))).toEqual(await ordinary(join(firstOut, "runtime", name)));
+    expect(await ordinary(join(extracted, name))).toEqual(
+      await ordinary(join(firstOut, "runtime", name)),
+    );
   }
   for (const name of OPTIONAL_RUNTIME_FILES) {
     expect(await ordinary(join(extracted, name))).toEqual(await ordinary(join(repo, name)));
   }
-  expect(await ordinary(join(extracted, "spritesheet.webp"))).toEqual(atlas);
-  const repacked = await packageRuntime(join(workspace, "readback.zip"), extracted, { petId: "louis" });
+  expect((await ordinary(join(extracted, "spritesheet.webp"))).equals(atlas)).toBe(true);
+  const repacked = await packageRuntime(join(workspace, "readback.zip"), extracted, {
+    petId: "louis",
+  });
   expect(repacked.archiveSha256).toBe(first.archiveSha256);
   expect(repacked.manifest).toEqual(first.payload);
 
-  const root = join(workspace, "local-root"), target = join(root, "pets/louis");
-  const home = join(workspace, "home"), other = join(root, "pets/other/keep.txt");
+  const root = join(workspace, "local-root"),
+    target = join(root, "pets/louis");
+  const home = join(workspace, "home"),
+    other = join(root, "pets/other/keep.txt");
   await mkdir(home);
   await mkdir(join(root, "pets/other"), { recursive: true });
   await writeFile(other, "Keep this unrelated pet unchanged.\n");
@@ -118,9 +155,15 @@ test("manifest-bound Louis builds reproducibly and survives a temporary local li
     expect(await readFile(other)).toEqual(sentinel);
   }
   async function payload(folder: string) {
-    return Promise.all(["pet.json", "spritesheet.webp"].map(async name => hash(await ordinary(join(folder, name)))));
+    return Promise.all(
+      ["pet.json", "spritesheet.webp"].map(async (name) =>
+        hash(await ordinary(join(folder, name))),
+      ),
+    );
   }
-  async function backups() { return (await readdir(join(root, "pet-backups"))).sort(); }
+  async function backups() {
+    return (await readdir(join(root, "pet-backups"))).sort();
+  }
   const expected = await payload(extracted);
   await lifecycle("install.sh");
   expect(await payload(target)).toEqual(expected);
@@ -128,18 +171,22 @@ test("manifest-bound Louis builds reproducibly and survives a temporary local li
   expect(await payload(target)).toEqual(expected);
 
   const pet = JSON.parse((await readFile(join(target, "pet.json"))).toString());
-  await writeFile(join(target, "pet.json"), JSON.stringify({ ...pet, description: "Previous local installation." }) + "\n");
-  const previous = await payload(target), beforeUpdate = await backups();
+  await writeFile(
+    join(target, "pet.json"),
+    JSON.stringify({ ...pet, description: "Previous local installation." }) + "\n",
+  );
+  const previous = await payload(target),
+    beforeUpdate = await backups();
   await lifecycle("install.sh");
   expect(await payload(target)).toEqual(expected);
-  const updateBackups = (await backups()).filter(name => !beforeUpdate.includes(name));
+  const updateBackups = (await backups()).filter((name) => !beforeUpdate.includes(name));
   expect(updateBackups).toHaveLength(1);
   expect(await payload(join(root, "pet-backups", updateBackups[0], "louis"))).toEqual(previous);
 
   const beforeRemove = await backups();
   await lifecycle("uninstall.sh");
   expect(await lstat(target).catch(() => null)).toBeNull();
-  const removalBackups = (await backups()).filter(name => !beforeRemove.includes(name));
+  const removalBackups = (await backups()).filter((name) => !beforeRemove.includes(name));
   expect(removalBackups).toHaveLength(1);
   const removed = join(root, "pet-backups", removalBackups[0], "louis");
   expect(await payload(removed)).toEqual(expected);

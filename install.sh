@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-louis_source=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
+louis_source=$(CDPATH='' cd -P "$(dirname "$0")" && pwd)
 louis_root="${LOUIS_CODEX_DIR:-${CODEX_HOME:-${HOME:?HOME is not set}/.codex}}"
 louis_stage=
 louis_backup=
@@ -41,9 +41,10 @@ if [ -e "$louis_source/LICENSE" ] || [ -L "$louis_source/LICENSE" ] ||
   louis_payload="$louis_payload LICENSE LICENSE-ARTWORK"
 fi
 for louis_file in $louis_payload SHA256SUMS; do
-  [ ! -L "$louis_source/$louis_file" ] && [ -f "$louis_source/$louis_file" ] &&
-    [ -r "$louis_source/$louis_file" ] && [ -s "$louis_source/$louis_file" ] ||
+  if [ -L "$louis_source/$louis_file" ] || [ ! -f "$louis_source/$louis_file" ] ||
+    [ ! -r "$louis_source/$louis_file" ] || [ ! -s "$louis_source/$louis_file" ]; then
     fail "Missing, empty, unreadable, or linked package file: $louis_file"
+  fi
 done
 louis_sums=$(cat "$louis_source/SHA256SUMS") || fail "Cannot read SHA256SUMS"
 printf '%s\n' "$louis_sums" | LC_ALL=C awk -v files="$louis_payload" '
@@ -81,7 +82,7 @@ for louis_file in $louis_payload; do
 done
 
 mkdir -p "$louis_root"
-louis_root=$(CDPATH= cd -P "$louis_root" && printf '%s/' "$PWD")
+louis_root=$(CDPATH='' cd -P "$louis_root" && printf '%s/' "$PWD")
 louis_root=${louis_root%/}
 louis_pets="$louis_root/pets"
 louis_target="$louis_pets/louis"

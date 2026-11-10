@@ -1,14 +1,21 @@
 #!/usr/bin/env bun
-import sharp from "sharp";
 import { createHash } from "node:crypto";
-import {readFile, writeFile} from 'node:fs/promises';
+import { readFile, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
+import sharp from "sharp";
 import { validateWebp } from "./media";
 
 type State = { name: string; row: number; frames: number; delays: number[] };
 type Contract = {
   version: number;
-  layout: { width: number; height: number; cellWidth: number; cellHeight: number; columns: number; rows: number };
+  layout: {
+    width: number;
+    height: number;
+    cellWidth: number;
+    cellHeight: number;
+    columns: number;
+    rows: number;
+  };
   states: State[];
   gaze: { rows: number[]; frames: number };
   actionRepeats: number;
@@ -21,13 +28,28 @@ const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest(
 export async function contract(): Promise<Contract> {
   const c = JSON.parse(await readFile(contractFile, "utf8")) as Contract;
   const l = c.layout;
-  if (c.version !== 1 || l.width !== 1536 || l.height !== 2288 || l.cellWidth !== 192 ||
-      l.cellHeight !== 208 || l.columns !== 8 || l.rows !== 11 || !Array.isArray(c.states)) {
+  if (
+    c.version !== 1 ||
+    l.width !== 1536 ||
+    l.height !== 2288 ||
+    l.cellWidth !== 192 ||
+    l.cellHeight !== 208 ||
+    l.columns !== 8 ||
+    l.rows !== 11 ||
+    !Array.isArray(c.states)
+  ) {
     throw new Error("Animation contract has an unsupported layout or version");
   }
   for (const s of c.states) {
-    if (!Number.isInteger(s.row) || s.row < 0 || s.row > 8 || s.frames < 1 || s.frames > 8 ||
-        s.delays.length !== s.frames || s.delays.some(d => !Number.isInteger(d) || d < 10)) {
+    if (
+      !Number.isInteger(s.row) ||
+      s.row < 0 ||
+      s.row > 8 ||
+      s.frames < 1 ||
+      s.frames > 8 ||
+      s.delays.length !== s.frames ||
+      s.delays.some((d) => !Number.isInteger(d) || d < 10)
+    ) {
       throw new Error(`Invalid animation contract state: ${s.name}`);
     }
   }
@@ -35,19 +57,27 @@ export async function contract(): Promise<Contract> {
 }
 
 export async function decode(path: string | Buffer, c: Contract): Promise<Atlas> {
-  const bytes=typeof path==="string"?await readFile(path):path;
+  const bytes = typeof path === "string" ? await readFile(path) : path;
   await validateWebp(bytes);
-  const label=typeof path==="string"?path:"atlas buffer";
+  const label = typeof path === "string" ? path : "atlas buffer";
   const image = sharp(bytes, { failOn: "warning" });
   const meta = await image.metadata();
-  if (meta.width !== c.layout.width || meta.height !== c.layout.height || meta.pages && meta.pages !== 1) {
+  if (
+    meta.width !== c.layout.width ||
+    meta.height !== c.layout.height ||
+    (meta.pages && meta.pages !== 1)
+  ) {
     throw new Error(`Atlas must be ${c.layout.width}x${c.layout.height}, one page: ${label}`);
   }
-  const { data, info } = await image.ensureAlpha().toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await image
+    .ensureAlpha()
+    .toColourspace("srgb")
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   if (info.channels !== 4 || info.width !== c.layout.width || info.height !== c.layout.height) {
     throw new Error(`Unable to decode four-channel RGBA atlas: ${label}`);
   }
-  return { pixels: data, path:label };
+  return { pixels: data, path: label };
 }
 
 function cell(c: Contract, p: Buffer, row: number, col: number): Buffer {
@@ -58,19 +88,6 @@ function cell(c: Contract, p: Buffer, row: number, col: number): Buffer {
     p.copy(out, y * cellWidth * 4, from, from + cellWidth * 4);
   }
   return out;
-}
-
-function putCell(c: Contract, p: Buffer, row: number, col: number, src: Buffer) {
-  const { width, cellWidth, cellHeight } = c.layout;
-  for (let y = 0; y < cellHeight; y++) {
-    const to = ((row * cellHeight + y) * width + col * cellWidth) * 4;
-    src.copy(p, to, y * cellWidth * 4, (y + 1) * cellWidth * 4);
-  }
-}
-
-function rowBytes(c: Contract, p: Buffer, row: number): Buffer {
-  const n = c.layout.width * c.layout.cellHeight * 4;
-  return p.subarray(row * n, (row + 1) * n);
 }
 
 function occupied(p: Buffer): number {
@@ -89,13 +106,15 @@ export function validateAtlas(a: Atlas, c: Contract) {
     if (row === undefined) throw new Error("Animation contract has too few gaze rows");
     used.add(`${row}:${i % c.layout.columns}`);
   }
-  for (let row = 0; row < c.layout.rows; row++) for (let col = 0; col < c.layout.columns; col++) {
-    const n = occupied(cell(c, a.pixels, row, col));
-    const key = `${row}:${col}`;
-    if (used.has(key) && n === 0) problems.push(`required cell ${key} is empty`);
-    if (!used.has(key) && n !== 0) problems.push(`unused cell ${key} contains ${n} pixels`);
-  }
-  if (!cell(c, a.pixels, 0, 0).equals(cell(c, a.pixels, 0, 6))) problems.push("neutral reserve 0:6 differs from idle frame 0:0");
+  for (let row = 0; row < c.layout.rows; row++)
+    for (let col = 0; col < c.layout.columns; col++) {
+      const n = occupied(cell(c, a.pixels, row, col));
+      const key = `${row}:${col}`;
+      if (used.has(key) && n === 0) problems.push(`required cell ${key} is empty`);
+      if (!used.has(key) && n !== 0) problems.push(`unused cell ${key} contains ${n} pixels`);
+    }
+  if (!cell(c, a.pixels, 0, 0).equals(cell(c, a.pixels, 0, 6)))
+    problems.push("neutral reserve 0:6 differs from idle frame 0:0");
   for (let i = 0; i < a.pixels.length; i += 4) {
     if (a.pixels[i + 3] === 0 && (a.pixels[i] || a.pixels[i + 1] || a.pixels[i + 2])) {
       problems.push(`hidden RGB at pixel ${i / 4}`);
@@ -114,39 +133,63 @@ export async function preview(atlas: string, stateName: string, output: string, 
   const c = await contract();
   const a = await decode(atlas, c);
   requireValid(a, c);
-  const state = c.states.find(s => s.name === stateName);
-  let frames: Buffer[], delays: number[], diagnostic = false;
-  const repeats=state && state.row>=3?c.actionRepeats:1;
+  const state = c.states.find((s) => s.name === stateName);
+  let frames: Buffer[],
+    delays: number[],
+    diagnostic = false;
+  const repeats = state && state.row >= 3 ? c.actionRepeats : 1;
   if (state) {
-    frames = Array.from({length:state.frames},(_,i)=>cell(c,a.pixels,state.row,i));
+    frames = Array.from({ length: state.frames }, (_, i) => cell(c, a.pixels, state.row, i));
     delays = state.delays;
   } else if (stateName === "gaze") {
-    frames = Array.from({length:c.gaze.frames},(_,i)=>cell(c,a.pixels,c.gaze.rows[Math.floor(i / 8)],i % 8));
+    frames = Array.from({ length: c.gaze.frames }, (_, i) =>
+      cell(c, a.pixels, c.gaze.rows[Math.floor(i / 8)], i % 8),
+    );
     delays = Array(c.gaze.frames).fill(180);
     diagnostic = true;
   } else throw new Error(`Unknown state: ${stateName}`);
-  frames=Array.from({length:repeats},()=>frames).flat();
-  delays=Array.from({length:repeats},()=>delays).flat();
+  frames = Array.from({ length: repeats }, () => frames).flat();
+  delays = Array.from({ length: repeats }, () => delays).flat();
   // GIF delays use centiseconds. All native delays in the contract are divisible by 10.
-  if (delays.some(d=>d % 10 !== 0)) throw new Error("GIF timing requires 10 ms delay increments");
+  if (delays.some((d) => d % 10 !== 0))
+    throw new Error("GIF timing requires 10 ms delay increments");
   const width = displaySize;
-  if (!Number.isInteger(width) || width < 16 || width > 1024) throw new Error("Display size must be 16–1024 pixels");
-  const height = Math.round(c.layout.cellHeight * width / c.layout.cellWidth);
+  if (!Number.isInteger(width) || width < 16 || width > 1024)
+    throw new Error("Display size must be 16–1024 pixels");
+  const height = Math.round((c.layout.cellHeight * width) / c.layout.cellWidth);
   const pageSize = width * height * 4;
   const pages = Buffer.alloc(pageSize * frames.length);
   for (let i = 0; i < frames.length; i++) {
-    const scaled = await sharp(frames[i], { raw: {width:c.layout.cellWidth,height:c.layout.cellHeight,channels:4} })
-      .resize(width,height,{kernel:"nearest"}).raw().toBuffer();
-    scaled.copy(pages,i*pageSize);
+    const scaled = await sharp(frames[i], {
+      raw: { width: c.layout.cellWidth, height: c.layout.cellHeight, channels: 4 },
+    })
+      .resize(width, height, { kernel: "nearest" })
+      .raw()
+      .toBuffer();
+    scaled.copy(pages, i * pageSize);
   }
-  await sharp(pages,{raw:{width,height:height*frames.length,channels:4,pageHeight:height}})
-    .gif({delay:delays,loop:0,dither:0,keepDuplicateFrames:true}).toFile(output);
-  const meta = await sharp(output,{animated:true}).metadata();
+  await sharp(pages, {
+    raw: { width, height: height * frames.length, channels: 4, pageHeight: height },
+  })
+    .gif({ delay: delays, loop: 0, dither: 0, keepDuplicateFrames: true })
+    .toFile(output);
+  const meta = await sharp(output, { animated: true }).metadata();
   if (meta.pages !== frames.length || JSON.stringify(meta.delay) !== JSON.stringify(delays)) {
     throw new Error("GIF readback timing or frame count differs from contract");
   }
-  const manifest = { output:basename(output), state:stateName, label:diagnostic?"gaze diagnostic preview":"native animation timing preview", diagnostic, repeats, frames:frames.length, delaysMs:delays, displaySize:[width,height], atlasRgbaSha256:digest(a.pixels), gifSha256:digest(await readFile(output)) };
+  const manifest = {
+    output: basename(output),
+    state: stateName,
+    label: diagnostic ? "gaze diagnostic preview" : "native animation timing preview",
+    diagnostic,
+    repeats,
+    frames: frames.length,
+    delaysMs: delays,
+    displaySize: [width, height],
+    atlasRgbaSha256: digest(a.pixels),
+    gifSha256: digest(await readFile(output)),
+  };
   const manifestPath = `${output}.json`;
-  await writeFile(manifestPath,JSON.stringify(manifest,null,2)+"\n");
-  return {...manifest,manifest:resolve(manifestPath)};
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  return { ...manifest, manifest: resolve(manifestPath) };
 }
