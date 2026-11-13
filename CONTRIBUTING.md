@@ -31,6 +31,11 @@ Biome formats and lints `tools/**/*.ts`, `checks/**/*.ts`, root JSON files, and 
 
 ## Build a package
 
+See [RELEASE.md](RELEASE.md) for the stable-only immutable release builder,
+manual dry-run/draft workflow, owner protection requirements, and compatibility
+limits. `bun run check:release` runs the release CLI integration checks in
+temporary full-source clones; it is also an independent read-only CI job.
+
 Before requesting review, run `bun run setup:security`, `bun run check:security-history`, `bun run check:security`, and `bun run check:dependencies` as well as quality and package checks. Fetch full history before the security scan (CI uses `fetch-depth: 0`). The history regression test uses temporary local clones and the pinned scanner; Gitleaks downloads use the same platform support and local `.quality-bin/` directory as quality tools. See [SECURITY.md](SECURITY.md) for mirror isolation, redaction, and coverage limits. Never upload a raw scan report. Dependency and action updates go through ordinary reviewed PRs; automated updates are proposals, not merge approval.
 
 The builder copies the sprite sheet without redrawing or recompressing it. Supply the hash from `SOURCE_INPUT.json`.

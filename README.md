@@ -71,7 +71,7 @@ Downloading source/dependencies or releases, using an agent, and running the hos
 
 ## Make changes
 
-Start with [GitHub Issues](https://github.com/dhruvaldarji/ai-pet-shihtzu/issues), the shared backlog for local and remote contributors. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and one-commit PRs, [MAINTAINERS.md](MAINTAINERS.md) for ownership and releases, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations. Agent instructions are in [AGENTS.md](AGENTS.md).
+Start with [GitHub Issues](https://github.com/dhruvaldarji/ai-pet-shihtzu/issues), the shared backlog for local and remote contributors. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and one-commit PRs, [RELEASE.md](RELEASE.md) for release safeguards and current limits, [MAINTAINERS.md](MAINTAINERS.md) for ownership, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations. Agent instructions are in [AGENTS.md](AGENTS.md).
 
 ## Licenses and security
 

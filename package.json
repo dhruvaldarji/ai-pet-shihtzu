@@ -19,7 +19,10 @@
     "setup:security": "sh tools/install-security-tools.sh",
     "check:security-history": "bun test checks/security.test.ts --timeout 30000",
     "check:security": "bun tools/security.ts",
-    "check:dependencies": "bun audit --audit-level=high"
+    "check:dependencies": "bun audit --audit-level=high",
+    "check:release": "bun test checks/release.test.ts --timeout 240000",
+    "release:prepare": "bun tools/release.ts",
+    "release:draft": "bun tools/release-draft.ts"
   },
   "dependencies": {
     "sharp": "0.35.5"
