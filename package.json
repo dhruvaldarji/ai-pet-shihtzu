@@ -21,8 +21,10 @@
     "check:security": "bun tools/security.ts",
     "check:dependencies": "bun audit --audit-level=high",
     "check:release": "bun test checks/release.test.ts --timeout 240000",
+    "check:site": "bun test checks/site.test.ts --timeout 240000",
     "release:prepare": "bun tools/release.ts",
-    "release:draft": "bun tools/release-draft.ts"
+    "release:draft": "bun tools/release-draft.ts",
+    "site:build": "bun tools/site.ts"
   },
   "dependencies": {
     "sharp": "0.35.5"

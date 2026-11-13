@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   compareStableVersions,
   parseStableVersion,
   RELEASE_ASSET_NAMES,
+  validateReleaseCatalog,
   validateReleaseDirectory,
 } from "./release";
 
@@ -13,7 +14,7 @@ const VERSION = "v1.2.3";
 let root: string;
 
 beforeAll(async () => {
-  root = await mkdtemp(join(tmpdir(), "louis-release-unit-"));
+  root = await mkdtemp(join(await realpath(tmpdir()), "louis-release-unit-"));
 });
 
 afterAll(async () => {
@@ -95,4 +96,15 @@ test("release directory validation rejects an empty or malformed catalog", async
   await mkdir(badVersion);
   for (const name of RELEASE_ASSET_NAMES) await writeFile(join(badVersion, name), "placeholder\n");
   await expect(validateReleaseDirectory(badVersion)).rejects.toThrow();
+});
+
+test("release catalog validation rejects empty catalogs and preparation markers", async () => {
+  const empty = join(root, "catalog-empty");
+  await mkdir(empty);
+  await expect(validateReleaseCatalog(empty)).rejects.toThrow();
+
+  const inProgress = join(root, "catalog-in-progress");
+  await mkdir(inProgress);
+  await writeFile(join(inProgress, ".prepare.lock"), "");
+  await expect(validateReleaseCatalog(inProgress)).rejects.toThrow();
 });

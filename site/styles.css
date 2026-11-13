@@ -1,0 +1,378 @@
+:root {
+  color-scheme: light;
+  --paper: #f7f4eb;
+  --ink: #173b2e;
+  --muted: #435b50;
+  --line: #cbd3c5;
+  --accent: #245a43;
+  --accent-ink: #fffdf6;
+  --panel: #eeeadf;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 76rem;
+  padding: 0 clamp(1rem, 4vw, 3rem);
+}
+
+a {
+  color: #174d38;
+  text-decoration-thickness: 0.09em;
+  text-underline-offset: 0.18em;
+  overflow-wrap: anywhere;
+}
+
+a:hover {
+  text-decoration-thickness: 0.15em;
+}
+
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #9a4c13;
+  outline-offset: 4px;
+}
+
+h1,
+h2,
+h3,
+.wordmark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+h1 {
+  font-size: clamp(3.5rem, 10vw, 6.75rem);
+  letter-spacing: -0.055em;
+  margin: 0.15em 0;
+}
+
+h2 {
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  margin: 0.2em 0 0.7em;
+}
+
+h3 {
+  font-size: 1.55rem;
+  margin: 0;
+}
+
+p,
+li {
+  max-width: 68ch;
+}
+
+code {
+  background: var(--panel);
+  border-radius: 0.2rem;
+  font-size: 0.94em;
+  overflow-wrap: anywhere;
+  padding: 0.08em 0.24em;
+}
+
+.skip-link {
+  background: var(--accent);
+  color: var(--accent-ink);
+  left: 1rem;
+  padding: 0.6rem 0.9rem;
+  position: absolute;
+  top: -5rem;
+  z-index: 2;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+.site-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  min-height: 5rem;
+}
+
+.wordmark {
+  color: var(--ink);
+  font-size: 1.65rem;
+  text-decoration: none;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.3rem;
+  justify-content: flex-end;
+}
+
+nav a,
+summary {
+  min-height: 44px;
+  padding: 0.55rem 0.2rem;
+}
+
+.hero {
+  align-items: center;
+  display: grid;
+  gap: clamp(2rem, 8vw, 7rem);
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.55fr);
+  padding: clamp(3rem, 9vw, 7rem) 0 4rem;
+}
+
+.hero-copy,
+.portrait,
+.story-grid > *,
+.release-list li {
+  min-width: 0;
+}
+
+.story {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.25rem, 2.5vw, 1.65rem);
+  line-height: 1.45;
+  max-width: 34ch;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  margin: 0 0 0.8rem;
+  text-transform: uppercase;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.7rem;
+}
+
+.button,
+button {
+  align-items: center;
+  background: var(--accent);
+  border: 2px solid var(--accent);
+  border-radius: 0.3rem;
+  color: var(--accent-ink);
+  display: inline-flex;
+  font: inherit;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.7rem 1rem;
+  text-align: center;
+  text-decoration: none;
+}
+
+.button span {
+  margin-left: 0.45rem;
+}
+
+.button.quiet {
+  background: transparent;
+  color: var(--accent);
+}
+
+button:disabled {
+  background: #e0ded5;
+  border-color: #8b938b;
+  color: #3b4840;
+  cursor: not-allowed;
+}
+
+.portrait {
+  margin: 0;
+  text-align: center;
+}
+
+.portrait img,
+.still-preview img,
+.animated-preview {
+  background: var(--panel);
+  border-radius: 1rem;
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-width: 100%;
+  width: 192px;
+}
+
+.portrait img {
+  width: min(100%, 288px);
+}
+
+.portrait figcaption {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.preview-banner {
+  background: #f2dfb5;
+  border-left: 5px solid #835116;
+  font-weight: 750;
+  margin: 1.5rem 0 0;
+  padding: 0.75rem 1rem;
+}
+
+.animation-section,
+.instructions,
+.release-section,
+.story-grid {
+  border-top: 1px solid var(--line);
+  margin-top: 3rem;
+  padding-top: 2.5rem;
+}
+
+.animation {
+  background: var(--panel);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem 1rem;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.animated-preview {
+  margin-top: 1rem;
+}
+
+.still-preview {
+  display: none;
+  padding-top: 1rem;
+}
+
+.story-grid {
+  display: grid;
+  gap: clamp(2rem, 6vw, 5rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.install-card {
+  background: var(--panel);
+  border-radius: 0.6rem;
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+
+.instructions ol {
+  padding-left: 1.35rem;
+}
+
+.instructions li {
+  margin: 0.9rem 0;
+  padding-left: 0.25rem;
+}
+
+.section-heading {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  justify-content: space-between;
+}
+
+.selected-release {
+  background: var(--panel);
+  border-radius: 0.4rem;
+  padding: 0.85rem 1rem;
+}
+
+.release-list {
+  list-style: none;
+  padding: 0;
+}
+
+.release-list li {
+  border-top: 1px solid var(--line);
+  padding: 1.5rem 0;
+}
+
+.release-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1.1rem;
+  margin: 0.8rem 0;
+  padding: 0;
+}
+
+.release-links li {
+  border: 0;
+  display: inline-block;
+  padding: 0;
+}
+
+footer {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  margin-top: 4rem;
+  padding: 1.5rem 0 3rem;
+}
+
+.not-found {
+  min-height: 60vh;
+  padding: 5rem 0;
+}
+
+@media (max-width: 680px) {
+  .site-header {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.8rem 0;
+  }
+
+  nav {
+    justify-content: flex-start;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .portrait {
+    grid-row: 1;
+  }
+
+  .story-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 360px) {
+  .actions,
+  .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animation[open] .animated-preview {
+    display: none;
+  }
+
+  .animation[open] .still-preview {
+    display: block;
+  }
+}

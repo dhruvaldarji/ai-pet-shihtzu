@@ -21,6 +21,7 @@ import { validateReleaseDirectory } from "../tools/release";
 const repo = resolve(import.meta.dir, "..");
 const VERSION = "v1.2.3";
 const OLDER_VERSION = "v1.2.2";
+const NEXT_VERSION = "v1.2.4";
 const VERSION_FILES = [
   "LICENSE",
   "LICENSE-ARTWORK",
@@ -132,14 +133,18 @@ test("release jobs verify checkout-fetched main without persisted credentials", 
 
 type CommandResult = { code: number; stdout: string; stderr: string };
 
-async function run(args: string[], cwd: string): Promise<CommandResult> {
+async function run(
+  args: string[],
+  cwd: string,
+  extraEnv: Record<string, string> = {},
+): Promise<CommandResult> {
   let processHandle: Bun.ReadableSubprocess;
   try {
     processHandle = Bun.spawn(args, {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      env: { ...process.env, ...extraEnv, GIT_TERMINAL_PROMPT: "0" },
     });
   } catch {
     throw new Error("A local release test command could not start");
@@ -338,6 +343,87 @@ test("release CLI is reproducible, immutable, and bound to clean production sour
         `https://github.com/dhruvaldarji/ai-pet-shihtzu/releases/download/${VERSION}/${asset.name}`,
       );
     }
+
+    const nextRun = await prepare(second.root, second.source, NEXT_VERSION);
+    expect(nextRun).toEqual({
+      code: 0,
+      stdout: `Prepared immutable release ${NEXT_VERSION}.\n`,
+      stderr: "",
+    });
+    const raceCatalog = join(temporary, "latest-pointer-race-catalog");
+    await mkdir(raceCatalog);
+    await mkdir(join(raceCatalog, VERSION));
+    for (const name of VERSION_FILES)
+      await copyFile(join(firstVersion, name), join(raceCatalog, VERSION, name));
+    const raceLatest = join(raceCatalog, "latest.json");
+    const oldPointer = await readFile(join(firstReleases, "latest.json"));
+    await writeFile(raceLatest, oldPointer);
+    const stagedNextDirectory = join(temporary, "latest-pointer-race-v2-stage");
+    await mkdir(stagedNextDirectory);
+    for (const name of VERSION_FILES)
+      await copyFile(join(secondReleases, NEXT_VERSION, name), join(stagedNextDirectory, name));
+    const stagedNextPointer = join(temporary, "latest-pointer-race-v2.json");
+    await copyFile(join(secondReleases, "latest.json"), stagedNextPointer);
+    const raceTest = `
+import { expect, mock, test } from "bun:test";
+import * as fs from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+
+const requiredEnv = (name) => {
+  const value = process.env[name];
+  if (!value) throw new Error("An isolated release race input is missing");
+  return value;
+};
+const originalReadFile = fs.readFile;
+let swapped = false;
+let capturedPointer;
+mock.module("node:fs/promises", () => ({
+  ...fs,
+  readFile: async (...args) => {
+    const bytes = await originalReadFile(...args);
+    if (String(args[0]) === requiredEnv("RACE_LATEST") && !swapped) {
+      capturedPointer = Buffer.from(bytes);
+      await fs.rename(requiredEnv("RACE_V2_DIRECTORY"), requiredEnv("RACE_V2_DESTINATION"));
+      await fs.rename(requiredEnv("RACE_V2_POINTER"), requiredEnv("RACE_LATEST"));
+      swapped = true;
+    }
+    return bytes;
+  },
+}));
+
+test("returns latest bytes from the validated pointer snapshot", async () => {
+  const { validateReleaseCatalog } = await import(
+    pathToFileURL(requiredEnv("RACE_RELEASE_MODULE")).href
+  );
+  const catalog = await validateReleaseCatalog(requiredEnv("RACE_CATALOG"));
+  expect(swapped).toBe(true);
+  expect(catalog.latest.version).toBe(requiredEnv("RACE_OLD_VERSION"));
+  expect(catalog.latestBytes.equals(capturedPointer)).toBe(true);
+  expect(catalog.releases.map((release) => release.manifest.version)).toEqual([
+    requiredEnv("RACE_OLD_VERSION"),
+  ]);
+  expect(
+    JSON.parse((await originalReadFile(requiredEnv("RACE_LATEST"), "utf8"))).version,
+  ).toBe(requiredEnv("RACE_NEW_VERSION"));
+  await fs.writeFile(requiredEnv("RACE_RESULT_MARKER"), "snapshot validated\\n");
+});
+`.trim();
+    const raceTestPath = join(temporary, "latest-pointer-race.test.ts");
+    await writeFile(raceTestPath, raceTest);
+    const raceMarker = join(temporary, "latest-pointer-race-passed");
+    const raceResult = await run([process.execPath, "test", raceTestPath], first.root, {
+      RACE_CATALOG: raceCatalog,
+      RACE_LATEST: raceLatest,
+      RACE_V2_DIRECTORY: stagedNextDirectory,
+      RACE_V2_DESTINATION: join(raceCatalog, NEXT_VERSION),
+      RACE_V2_POINTER: stagedNextPointer,
+      RACE_RELEASE_MODULE: join(first.root, "tools/release.ts"),
+      RACE_OLD_VERSION: VERSION,
+      RACE_NEW_VERSION: NEXT_VERSION,
+      RACE_RESULT_MARKER: raceMarker,
+    });
+    expect(raceResult.code).toBe(0);
+    expect(await readFile(raceMarker, "utf8")).toBe("snapshot validated\n");
 
     const badUrlDirectory = join(temporary, "bad-url", VERSION);
     await mkdir(badUrlDirectory, { recursive: true });
