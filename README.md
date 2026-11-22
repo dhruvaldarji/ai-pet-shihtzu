@@ -25,7 +25,7 @@ Ask the agent to follow [AGENTS.md](AGENTS.md). This prompt is a request, not a 
 
 ### Manual local installation
 
-Use a versioned ZIP from [Releases](https://github.com/dhruvaldarji/ai-pet-shihtzu/releases) when one is available. Compare its SHA256 with the published checksum, then extract it and verify its internal `SHA256SUMS`. Checksums detect changed bytes, not publisher identity. If no release is available, [build a chosen source commit](CONTRIBUTING.md#build-a-package); do not install synthetic fixtures or run the source-root installer as if it were a complete package.
+Use a versioned ZIP such as `louis-v1.0.0.zip` from [Releases](https://github.com/dhruvaldarji/ai-pet-shihtzu/releases) when one is available. Compare its SHA256 with the published checksum, then extract it and verify its internal `SHA256SUMS`. Checksums detect changed bytes, not publisher identity. If no release is available, [build a chosen source commit](CONTRIBUTING.md#build-a-package); do not install synthetic fixtures or run the source-root installer as if it were a complete package.
 
 Run `sh install.sh` from the extracted package folder. The root is the first nonempty value of `LOUIS_CODEX_DIR`, `CODEX_HOME`, or `$HOME/.codex`; set `LOUIS_CODEX_DIR` explicitly for a different root. Keep that same root for updates and uninstall. The installer checks the package before replacing files and reports the backup location for an existing Louis.
 
