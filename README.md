@@ -6,6 +6,21 @@ Louis is a small Shih Tzu for your desktop. He naps, runs, follows your cursor, 
 
 Louis is a hobby pet project, not an official OpenAI product. No plugin is required. Support and updates are best effort.
 
+## Animation previews
+
+![Louis idle](assets/previews/idle.gif)
+
+| Preview | State |
+| --- | --- |
+| ![Louis running right](assets/previews/running-right.gif) | Running right |
+| ![Louis running left](assets/previews/running-left.gif) | Running left |
+| ![Louis waving](assets/previews/waving.gif) | Waving |
+| ![Louis jumping](assets/previews/jumping.gif) | Jumping |
+| ![Louis failed](assets/previews/failed.gif) | Failed |
+| ![Louis waiting](assets/previews/waiting.gif) | Waiting |
+| ![Louis running](assets/previews/running.gif) | Running |
+| ![Louis reviewing](assets/previews/review.gif) | Review |
+
 ## Compatibility
 
 - The package uses sprite format v2: 1536 × 2288 pixels, eight columns and eleven rows.

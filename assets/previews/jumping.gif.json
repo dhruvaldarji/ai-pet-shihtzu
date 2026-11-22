@@ -1,0 +1,31 @@
+{
+  "output": "jumping.gif",
+  "state": "jumping",
+  "label": "native animation timing preview",
+  "diagnostic": false,
+  "repeats": 3,
+  "frames": 15,
+  "delaysMs": [
+    140,
+    140,
+    140,
+    140,
+    280,
+    140,
+    140,
+    140,
+    140,
+    280,
+    140,
+    140,
+    140,
+    140,
+    280
+  ],
+  "displaySize": [
+    192,
+    208
+  ],
+  "atlasRgbaSha256": "d5b4a3085863a27c4b1b1e86f1da7abf29a99311c5bbbb1b5bfb5e818ce217ff",
+  "gifSha256": "e7813f4ce61145dd24d3522147745f51723a1c1239807803de006002950ad248"
+}

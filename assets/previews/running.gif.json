@@ -1,0 +1,34 @@
+{
+  "output": "running.gif",
+  "state": "running",
+  "label": "native animation timing preview",
+  "diagnostic": false,
+  "repeats": 3,
+  "frames": 18,
+  "delaysMs": [
+    120,
+    120,
+    120,
+    120,
+    120,
+    220,
+    120,
+    120,
+    120,
+    120,
+    120,
+    220,
+    120,
+    120,
+    120,
+    120,
+    120,
+    220
+  ],
+  "displaySize": [
+    192,
+    208
+  ],
+  "atlasRgbaSha256": "d5b4a3085863a27c4b1b1e86f1da7abf29a99311c5bbbb1b5bfb5e818ce217ff",
+  "gifSha256": "f3843ce9f07b0d85667d7b0b045a63dd5e641b9ea237dd8d03f40b63a4255c75"
+}

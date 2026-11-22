@@ -1,0 +1,34 @@
+{
+  "output": "waiting.gif",
+  "state": "waiting",
+  "label": "native animation timing preview",
+  "diagnostic": false,
+  "repeats": 3,
+  "frames": 18,
+  "delaysMs": [
+    150,
+    150,
+    150,
+    150,
+    150,
+    260,
+    150,
+    150,
+    150,
+    150,
+    150,
+    260,
+    150,
+    150,
+    150,
+    150,
+    150,
+    260
+  ],
+  "displaySize": [
+    192,
+    208
+  ],
+  "atlasRgbaSha256": "d5b4a3085863a27c4b1b1e86f1da7abf29a99311c5bbbb1b5bfb5e818ce217ff",
+  "gifSha256": "0d91230e3d0ed187dd692fe780a94bfe6ddbff55458f5aa97000c62ae2e22ae3"
+}

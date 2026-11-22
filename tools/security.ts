@@ -9,6 +9,15 @@ const approvedMedia = new Set([
   "assets/atlas.webp",
   "fixtures/runtime/spritesheet.webp",
   "fixtures/runtime/preview.gif",
+  "assets/previews/failed.gif",
+  "assets/previews/idle.gif",
+  "assets/previews/jumping.gif",
+  "assets/previews/review.gif",
+  "assets/previews/running-left.gif",
+  "assets/previews/running-right.gif",
+  "assets/previews/running.gif",
+  "assets/previews/waiting.gif",
+  "assets/previews/waving.gif",
 ]);
 
 export function checkTrackedPaths(paths: string[]) {

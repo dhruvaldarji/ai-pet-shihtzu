@@ -17,6 +17,24 @@ test("only reviewed tracked media and non-private paths pass", () => {
   }
 });
 
+test("only the reviewed preview GIF paths are approved", () => {
+  const previews = [
+    "assets/previews/failed.gif",
+    "assets/previews/idle.gif",
+    "assets/previews/jumping.gif",
+    "assets/previews/review.gif",
+    "assets/previews/running-left.gif",
+    "assets/previews/running-right.gif",
+    "assets/previews/running.gif",
+    "assets/previews/waiting.gif",
+    "assets/previews/waving.gif",
+  ];
+  expect(() => checkTrackedPaths(previews)).not.toThrow();
+  expect(() => checkTrackedPaths(["assets/previews/unreviewed.gif"])).toThrow(
+    "Unapproved tracked media",
+  );
+});
+
 test("action pins are checked in parsed YAML including inline mappings and aliases", () => {
   const pin = "a".repeat(40);
   expect(() =>

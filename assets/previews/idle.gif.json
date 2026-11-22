@@ -1,0 +1,22 @@
+{
+  "output": "idle.gif",
+  "state": "idle",
+  "label": "native animation timing preview",
+  "diagnostic": false,
+  "repeats": 1,
+  "frames": 6,
+  "delaysMs": [
+    1680,
+    660,
+    660,
+    840,
+    840,
+    1920
+  ],
+  "displaySize": [
+    192,
+    208
+  ],
+  "atlasRgbaSha256": "d5b4a3085863a27c4b1b1e86f1da7abf29a99311c5bbbb1b5bfb5e818ce217ff",
+  "gifSha256": "9d074796976c12656bb826dd1383501f916b302bf4bdf28a5b8e3e5f6e99aa49"
+}
