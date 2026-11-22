@@ -6,7 +6,10 @@
     "build": "bun tools/build.ts",
     "test": "bun test tools --timeout 30000",
     "check:setup": "bun tools/check-dependencies.ts",
-    "check:production": "bun test checks --timeout 60000"
+    "check:production": "bun test checks/production.test.ts --timeout 60000",
+    "check:release": "bun test checks/release.test.ts --timeout 240000",
+    "release:prepare": "bun tools/release.ts",
+    "release:draft": "bun tools/release-draft.ts"
   },
   "dependencies": {
     "sharp": "0.35.5"

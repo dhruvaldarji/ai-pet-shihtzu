@@ -49,6 +49,19 @@ Use `--id louis-motion-preview` and a new output folder for a separate local tes
 
 The `production-artifact` CI job runs on Ubuntu 24.04 and macOS 15. Reproducibility is checked within each platform, not between operating systems. The existing `test` job keeps synthetic regression tests and dependency auditing on Ubuntu. Windows and native app playback are not verified by these jobs. Passing CI does not approve artwork rights, a changed source hash, or publication; those still need maintainer review.
 
+## Release checks
+
+See [RELEASE.md](RELEASE.md) for the manual, main-only release workflow and its
+versioned `louis-<version>.zip` asset. It runs the frozen install, setup check,
+full tools tests, production checks, dependency audit, and release integration
+tests. The release branch intentionally does not install optional policy,
+formatting, or history-scanner layers from separate drafts; its narrow source
+guard is not a replacement for source-history review. The protected draft
+environment and immutable-release settings still require owner verification,
+and native playback remains unverified. Until the live owner-reviewed draft
+gate is exercised, use `Refs #9` rather than claiming the release issue is
+complete.
+
 ## Artwork changes
 
 Show the complete frames before and after the change. Include a full animation loop with native timing.
