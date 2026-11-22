@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Louis, a small desktop pet, and its versioned local release catalog.">
+    <title>Louis — a little company for your desktop</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="wordmark" href="./" aria-label="Louis home">Louis</a>
+      <nav aria-label="Main navigation">
+        <a href="#install">Install</a>
+        <a href="#update">Update</a>
+        <a href="#releases">Releases</a>
+        <a href="https://github.com/dhruvaldarji/ai-pet-shihtzu">Source</a>
+      </nav>
+    </header>
+    <main id="main" tabindex="-1">
+      {{PREVIEW_BANNER}}
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow">A small desktop pet</p>
+          <h1 id="page-title">Louis</h1>
+          <p class="story">Louis rules the day with tiny acts of mischief and very important naps.</p>
+          <p>Louis naps, runs, follows your cursor, and reacts while you work.</p>
+          <div class="actions">
+            <a class="button" href="{{ZIP_URL}}">Download package <span>{{VERSION}}</span></a>
+            <a class="button quiet" href="#update">Update existing Louis</a>
+          </div>
+        </div>
+        <figure class="portrait">
+          <img src="./poster.png" width="192" height="208" alt="Louis resting in the first frame of the sprite sheet">
+          <figcaption>Still frame from the selected release</figcaption>
+        </figure>
+      </section>
+
+      <section class="animation-section" aria-labelledby="animation-title">
+        <h2 id="animation-title">A little movement, when you ask</h2>
+        <details class="animation">
+          <summary>Show animation preview (close this panel to hide it)</summary>
+          <img class="animated-preview" src="{{ANIMATION_URL}}" width="192" height="208" alt="Louis moving through a short sprite animation">
+          <div class="still-preview">
+            <img src="./poster.png" width="192" height="208" alt="Still frame of Louis; animation is hidden because reduced motion is enabled">
+            <p>Still frame shown because your system requests reduced motion.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="story-grid" aria-label="Project details">
+        <article id="compatibility">
+          <p class="eyebrow">Compatibility</p>
+          <h2>Made for a local desktop pet</h2>
+          <ul>
+            <li>Local install and update scripts target POSIX systems such as macOS and Linux.</li>
+            <li>Windows installation and web or cloud upload are unsupported.</li>
+            <li>Native playback and direct installation are unverified; the app controls animation timing.</li>
+          </ul>
+          <p>Mobile browsers do not provide a supported install path. Use the verified manual package on a supported desktop instead.</p>
+        </article>
+        <article class="install-card" aria-labelledby="native-title">
+          <p class="eyebrow">Native install</p>
+          <h2 id="native-title">Not enabled</h2>
+          <button type="button" disabled aria-describedby="native-note">Install Louis</button>
+          <p id="native-note">The native link is unverified and this button is intentionally disabled. Use the manual local steps below; there is no active install link.</p>
+        </article>
+      </section>
+
+      <section id="install" class="instructions" aria-labelledby="install-title">
+        <p class="eyebrow">Start here</p>
+        <h2 id="install-title">Install Louis locally</h2>
+        <ol>
+          <li>Choose a versioned package. Before extracting, obtain its <code>release.json</code> and <code>SHA256SUMS</code> from a separately trusted published source. The outer checksum file covers all eight data files plus <code>release.json</code>; <code>sha256sum -c SHA256SUMS</code> (or <code>shasum -a 256 -c SHA256SUMS</code>) checks the complete set. For a ZIP-only download, compare its hash with the Louis ZIP descriptor in the trusted manifest.</li>
+          <li>After extraction, verify the package's inner <code>SHA256SUMS</code> with <code>sha256sum -c SHA256SUMS</code> or <code>shasum -a 256 -c SHA256SUMS</code> from the extracted folder.</li>
+          <li>Run <code>sh install.sh</code> in that verified folder. The local root is the first non-empty value of <code>LOUIS_CODEX_DIR</code>, <code>CODEX_HOME</code>, or <code>$HOME/.codex</code>.</li>
+          <li>Use that same root for later updates and uninstall. Select Louis in the app if needed and check its appearance.</li>
+        </ol>
+        <p>Checksums detect changed bytes, not publisher identity. A successful script only establishes local file installation, not visible playback or cloud delivery. Preview artifacts are not published downloads.</p>
+      </section>
+
+      <section id="update" class="instructions" aria-labelledby="update-title">
+        <p class="eyebrow">Keep your copy</p>
+        <h2 id="update-title">Update an existing Louis</h2>
+        <p>Verify and extract the newer version, then run its <code>sh install.sh</code> using the same local root and pet ID. An identical payload is a no-op. A changed payload preserves custom files and keeps the complete previous Louis in <code>pet-backups/</code> before replacement. Other pets stay unchanged.</p>
+        <p>Updates are user-requested. There is no background updater, automatic release download, or cloud-upload fallback.</p>
+      </section>
+
+      <section class="instructions" aria-labelledby="recovery-title">
+        <p class="eyebrow">Keep control</p>
+        <h2 id="recovery-title">Uninstall or restore</h2>
+        <p>Run <code>sh uninstall.sh</code> from the verified package with the same root. Louis is moved to a complete backup; repeated removal while absent is a no-op.</p>
+        <p>To restore, close the app and stop other pet operations. Preserve any current Louis by uninstalling it first, then copy the complete backup <code>louis</code> folder to the now-absent, non-symlink <code>&lt;root&gt;/pets/louis</code> path. Never merge or overwrite. Keep the backup until you reopen the app and check the restored pet.</p>
+      </section>
+
+      <section id="releases" class="release-section" aria-labelledby="releases-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Versioned files</p>
+            <h2 id="releases-title">Release catalog</h2>
+          </div>
+          <p><a href="./releases/latest.json">Latest discovery metadata</a> is a catalog pointer, not an updater.</p>
+        </div>
+        <p class="selected-release">Selected {{VERSION}} · source <a href="{{SOURCE_URL}}"><code>{{SOURCE_COMMIT}}</code></a> · release manifest SHA256 <code>{{RELEASE_SHA256}}</code></p>
+        <ul class="release-list">
+          {{RELEASE_ROWS}}
+        </ul>
+      </section>
+
+      <section class="story-grid" aria-label="Privacy and licenses">
+        <article>
+          <p class="eyebrow">Privacy</p>
+          <h2>No tracking here</h2>
+          <p>This static page uses no analytics, cookies, authentication, or backend. The hosting and download services have their own policies.</p>
+        </article>
+        <article>
+          <p class="eyebrow">Licenses</p>
+          <h2>Two kinds of work</h2>
+          <p>Software: 0BSD. Artwork: CC0 1.0. Each release links to its versioned license files; dependency licenses remain separate.</p>
+        </article>
+      </section>
+    </main>
+    <footer>
+      <p>Louis is a hobby pet project, not an official OpenAI product. <a href="https://github.com/dhruvaldarji/ai-pet-shihtzu">View the project source</a>.</p>
+      <p>Catalog metadata is generated from verified release files. It does not certify publication or deployment.</p>
+    </footer>
+  </body>
+</html>

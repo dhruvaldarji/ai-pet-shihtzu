@@ -86,6 +86,13 @@ export type ValidatedRelease = {
   files: ReadonlyMap<string, Buffer>;
 };
 
+type ValidatedReleaseCatalog = {
+  directory: string;
+  releases: ValidatedRelease[];
+  latest: LatestPointer;
+  latestBytes: Buffer;
+};
+
 export type ReleaseSourceBinding = {
   sourceCommit: string;
   atlasSha256: string;
@@ -594,7 +601,9 @@ async function latestForDirectory(directory: string, version: string) {
   return { latest, bytes: jsonBytes(latest), sourceCommit: release.manifest.sourceCommit };
 }
 
-async function readLatestPointer(releasesDirectory: string): Promise<LatestPointer | null> {
+async function readLatestPointerSnapshot(
+  releasesDirectory: string,
+): Promise<{ pointer: LatestPointer; bytes: Buffer } | null> {
   const path = join(releasesDirectory, "latest.json");
   const stat = await statOrNull(path);
   if (!stat) return null;
@@ -650,7 +659,41 @@ async function readLatestPointer(releasesDirectory: string): Promise<LatestPoint
   const verified = await latestForDirectory(versionDirectory, pointer.version);
   if (verified.sourceCommit !== pointer.sourceCommit || !verified.bytes.equals(bytes))
     throw new Error("Latest pointer does not match its immutable release");
-  return pointer;
+  return { pointer, bytes };
+}
+
+async function readLatestPointer(releasesDirectory: string): Promise<LatestPointer | null> {
+  const snapshot = await readLatestPointerSnapshot(releasesDirectory);
+  return snapshot?.pointer ?? null;
+}
+
+export async function validateReleaseCatalog(
+  catalogDirectory: string,
+): Promise<ValidatedReleaseCatalog> {
+  const directory = resolve(catalogDirectory);
+  await ensureDirectory(directory, false);
+  const names = (await readdir(directory)).sort();
+  if (!names.includes("latest.json")) throw new Error("Release catalog is incomplete");
+  const versions = names.filter((name) => name !== "latest.json");
+  if (versions.length === 0) throw new Error("Release catalog is empty");
+  const releases: ValidatedRelease[] = [];
+  for (const version of versions) {
+    parseStableVersion(version);
+    const path = join(directory, version);
+    const stat = await lstat(path);
+    if (!stat.isDirectory() || stat.isSymbolicLink())
+      throw new Error("Release catalog entries must be ordinary version directories");
+    releases.push(await validateReleaseDirectory(path, { version }));
+  }
+  const latestSnapshot = await readLatestPointerSnapshot(directory);
+  if (!latestSnapshot) throw new Error("Release catalog has no latest pointer");
+  const { pointer: latest, bytes: latestBytes } = latestSnapshot;
+  const greatest = [...releases]
+    .sort((left, right) => compareStableVersions(left.manifest.version, right.manifest.version))
+    .at(-1);
+  if (!greatest || latest.version !== greatest.manifest.version)
+    throw new Error("Latest pointer must name the greatest stable release");
+  return { directory, releases, latest, latestBytes };
 }
 
 export async function prepareRelease(options: PrepareOptions) {

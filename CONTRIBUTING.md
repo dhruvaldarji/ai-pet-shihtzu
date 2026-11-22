@@ -64,6 +64,14 @@ Use `--id louis-motion-preview` and a new output folder for a separate local tes
 
 The `production-artifact` CI job runs on Ubuntu 24.04 and macOS 15. Reproducibility is checked within each platform, not between operating systems. The existing `test` job keeps synthetic regression tests and dependency auditing on Ubuntu. Windows and native app playback are not verified by these jobs. Passing CI does not approve artwork rights, a changed source hash, or publication; those still need maintainer review.
 
+## Static site checks
+
+See [SITE.md](SITE.md) for the offline builder. It validates the complete release
+catalog before copying files, produces preview output by default, and refuses
+to replace changed output. `bun run check:site` exercises both modes with
+production artwork in isolated temporary roots. It does not publish or deploy
+the site.
+
 ## Artwork changes
 
 Show the complete frames before and after the change. Include a full animation loop with native timing.
