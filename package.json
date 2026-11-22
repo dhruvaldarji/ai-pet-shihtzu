@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "build": "bun tools/build.ts",
+    "previews": "bun tools/previews.ts",
+    "check:previews": "bun tools/previews.ts --check",
     "test": "bun test tools --timeout 30000",
     "check:setup": "bun tools/check-dependencies.ts",
     "check:production": "bun test checks/production.test.ts --timeout 60000",

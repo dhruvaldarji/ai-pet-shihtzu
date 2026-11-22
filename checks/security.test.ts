@@ -94,6 +94,14 @@ async function legacyScanner() {
   return source;
 }
 
+async function installLegacyScanner(root: string) {
+  await writeFile(join(root, "tools/security.ts"), await legacyScanner());
+  const previewGifs = git(root, "ls-files", "-z", "assets/previews")
+    .split("\0")
+    .filter((path) => path.endsWith(".gif"));
+  if (previewGifs.length) git(root, "rm", "--cached", "--", ...previewGifs);
+}
+
 afterAll(async () => {
   await Promise.all(workspaces.map((workspace) => rm(workspace, { recursive: true, force: true })));
 });
@@ -132,7 +140,7 @@ test("history scan isolates source ignores and includes non-HEAD refs", async ()
   expect(emittedOnly(ignoredScan, 1, "stderr", failureMessage)).toBe(true);
   expect(beforeIgnoredScan === (await state(source))).toBe(true);
 
-  await writeFile(join(source, "tools/security.ts"), await legacyScanner());
+  await installLegacyScanner(source);
   expect(emittedOnly(await runScanner(source), 0, "stdout", successMessage)).toBe(true);
 });
 
@@ -172,6 +180,6 @@ test("history scan includes canaries introduced only by merge commits", async ()
   expect(absentFromParents).toBe(true);
   expect(emittedOnly(await runScanner(source), 1, "stderr", failureMessage)).toBe(true);
 
-  await writeFile(join(source, "tools/security.ts"), await legacyScanner());
+  await installLegacyScanner(source);
   expect(emittedOnly(await runScanner(source), 0, "stdout", successMessage)).toBe(true);
 });

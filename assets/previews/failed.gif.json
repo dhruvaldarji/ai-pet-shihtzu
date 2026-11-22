@@ -1,0 +1,40 @@
+{
+  "output": "failed.gif",
+  "state": "failed",
+  "label": "native animation timing preview",
+  "diagnostic": false,
+  "repeats": 3,
+  "frames": 24,
+  "delaysMs": [
+    140,
+    140,
+    140,
+    140,
+    140,
+    140,
+    140,
+    240,
+    140,
+    140,
+    140,
+    140,
+    140,
+    140,
+    140,
+    240,
+    140,
+    140,
+    140,
+    140,
+    140,
+    140,
+    140,
+    240
+  ],
+  "displaySize": [
+    192,
+    208
+  ],
+  "atlasRgbaSha256": "d5b4a3085863a27c4b1b1e86f1da7abf29a99311c5bbbb1b5bfb5e818ce217ff",
+  "gifSha256": "f94b950ffdf28a63fe7b3a014c6e7251da95983b60d18287534b528af3b46b29"
+}

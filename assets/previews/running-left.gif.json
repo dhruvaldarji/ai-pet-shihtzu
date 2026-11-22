@@ -1,0 +1,24 @@
+{
+  "output": "running-left.gif",
+  "state": "running-left",
+  "label": "native animation timing preview",
+  "diagnostic": false,
+  "repeats": 1,
+  "frames": 8,
+  "delaysMs": [
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    220
+  ],
+  "displaySize": [
+    192,
+    208
+  ],
+  "atlasRgbaSha256": "d5b4a3085863a27c4b1b1e86f1da7abf29a99311c5bbbb1b5bfb5e818ce217ff",
+  "gifSha256": "5c2a5633e306d33b26c4fa6138bb6903c5289ada4da5d8152764770c88754a15"
+}

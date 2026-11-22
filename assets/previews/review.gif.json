@@ -1,0 +1,34 @@
+{
+  "output": "review.gif",
+  "state": "review",
+  "label": "native animation timing preview",
+  "diagnostic": false,
+  "repeats": 3,
+  "frames": 18,
+  "delaysMs": [
+    150,
+    150,
+    150,
+    150,
+    150,
+    280,
+    150,
+    150,
+    150,
+    150,
+    150,
+    280,
+    150,
+    150,
+    150,
+    150,
+    150,
+    280
+  ],
+  "displaySize": [
+    192,
+    208
+  ],
+  "atlasRgbaSha256": "d5b4a3085863a27c4b1b1e86f1da7abf29a99311c5bbbb1b5bfb5e818ce217ff",
+  "gifSha256": "25fab952356693f3f2f2b59f83789820c0dbabdc48b75a7ff9e545aff6855c14"
+}

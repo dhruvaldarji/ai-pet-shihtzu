@@ -1,0 +1,28 @@
+{
+  "output": "waving.gif",
+  "state": "waving",
+  "label": "native animation timing preview",
+  "diagnostic": false,
+  "repeats": 3,
+  "frames": 12,
+  "delaysMs": [
+    140,
+    140,
+    140,
+    280,
+    140,
+    140,
+    140,
+    280,
+    140,
+    140,
+    140,
+    280
+  ],
+  "displaySize": [
+    192,
+    208
+  ],
+  "atlasRgbaSha256": "d5b4a3085863a27c4b1b1e86f1da7abf29a99311c5bbbb1b5bfb5e818ce217ff",
+  "gifSha256": "cfccaece331745a2cfd980161a005b827050a405955c4020daef2704c4d603a6"
+}
